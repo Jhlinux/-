@@ -1,0 +1,64 @@
+实验一：搭建基础的DNS服务器
+ 虚拟机A：
+  	1，安装软件包：bind  bind-chroot
+	2，修改主配置文件：/etc/named.conf (修改之前先备份)
+	        options {
+		     directory      "/var/named"; 指定地址库文件存放路径	
+		};
+		
+		zone  "tedu.cn" IN {   指定负责解析的域名为：tedu.cn
+    			type  master;  指定本机为主服务器
+			file  "tedu.cn.zone"; 指定地址库文件名称
+		};
+	3，建立地址库文件保证named用户有读权限
+		cd  /var/named
+		cp  -p  named.localhost   tedu.cn.zone  
+                ls   tedu.cn.zone
+                vim   /var/named/tedu.cn.zone
+                      tedu.cn.     NS    svr7
+     		      svr7         A      192.168.4.7
+		      www          A      192.168.4.1
+                      ftp          A      192.168.4.2
+        4，重起服务   systemctl  restart named
+  虚拟机B：
+	1，指定本机DNS服务器地址：/etc/resolv.conf 
+             echo  nameserver  192.168.4.7  > /etc/resolv.conf
+	2，测试解析：nslookup  www.tedu.cn
+                     nslookup  ftp.tedu.cn
+
+
+实验二：构建多区域的DNS服务器：
+        虚拟机A：部署DNS服务，最终实现  www.qq.com ----->  1.2.3.4
+        1，修改配置文件  vim  /etc/named.conf
+                   options  {
+                        directory   "/var/named";
+                   };
+		   zone   "tedu.cn" IN   {
+                          type  master;
+                          file  "tedu.cn.zone";
+                   };
+		   zone    "qq.com"  IN  {
+			   type   master;
+                           file   "qq.com.zone";
+		   };
+	2,建立地址库文件保证named 用户有读权限
+             cd   /var/named
+             cp  -p   tedu.cn.zone   qq.com.zone
+             vim   /var/named/qq.com.zone
+                    qq.com.       NS       svr7
+                    svr7          A        192.168.4.7
+                    www           A        1.2.3.4
+	3,重起服务：systemctl  restart named
+ 泛域名解析：
+       vim   /var/named/tedu.cn.zone
+               tedu.cn.    NS     svr7
+                svr7       A       192.168.4.7
+                tedu.cn.   A       10.20.30.40
+                *          A       11.12.13.14
+        systemctl  restart  named
+
+        虚拟机B 测试  
+                   nslookup   tedu.cn
+                   nslookup   www.tedu.cn
+                   nslookup   xoix.tedu.cn
+  
