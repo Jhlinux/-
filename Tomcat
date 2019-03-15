@@ -1,0 +1,193 @@
+        Tomcat服务器 + 使用Tomcat部署虚拟web主机
+
+本案例要求部署Tomcat服务器，具体要求如下：
+      安装部署JDK基础环境
+      安装部署Tomcat服务器
+      创建JSP测试页面，名为test.jsp，显示服务器当前时间
+      客户端访问此web服务器验证效果
+
+       Tomcat服务器：192.168.4.5/24
+               |
+               |
+          网关 |----> 192.168.4.0/24
+               |
+       linux客户机：192.168.4.9/24
+
+部署之前先关闭防火墙和selinux
+服务器配置：
+安装JDK环境：
+[root@redhat ~]# yum -y install java-1.8.0-openjdk
+[root@redhat ~]# yum -y install java-1.8.0-openjdk-headless
+[root@redhat ~]# java -version #查看java版本
+openjdk version "1.8.0_131"
+安装Tomcat
+[root@redhat ~]# ls
+    apache-tomcat-8.0.30.tar.gz
+[root@redhat ~]# tar -xf apache-tomcat-8.0.30.tar.gz
+[root@redhat ~]# ls
+    apache-tomcat-8.0.30       
+    apache-tomcat-8.0.30.tar.gz
+[root@redhat ~]# mv apache-tomcat-8.0.30 /usr/local/tomcat
+[root@redhat ~]# ls /usr/local/tomcat
+bin   lib      logs    RELEASE-NOTES  temp     work
+conf  LICENSE  NOTICE  RUNNING.txt    webapps
+启动服务：
+[root@redhat ~]# /usr/local/tomcat/bin/startup.sh
+查看状态：
+[root@redhat ~]# netstat -tunlp | grep :8080
+停止服务：
+[root@redhat ~]# /usr/local/tomcat/bin/shutdown.sh
+创建测试页面：
+[root@redhat ~]# vim /usr/local/tomcat/webapps/ROOT/test.jsp
+<html>
+<body>
+<center>
+Now time is: <%=new java.util.Date()%>            
+</center>
+</body>
+</html>
+客户端访问测试：
+      http://192.168.4.5:8080/test.jsp
+          Now time is: Sat Mar 09 19:09:47 CST 2019 
+#############################################################
+本案例要求使用Tomcat部署虚拟主机，要求如下：
+    实现两个基于域名的虚拟主机，域名分别为：www.a.com和www.b.com
+    使用www.a.com域名访问的页面根路径为:/usr/local/tomcat/a/ROOT
+    使用www.b.com域名访问的页面根路径为:/usr/local/tomcat/b/base
+    访问www.a.com/test时，页面自动调转到/var/www/html目录下的页面
+    访问页面时支持SSL加密通信
+    私钥，证书存放路径为：/usr/local/tomcat/conf/cert
+    每个虚拟主机都有独立的访问日志文件
+    配置tomcat集群环境
+
+沿用上面的案例：修改配置文件，创建两个域名的虚拟主机
+[root@redhat ~]# vim /usr/local/tomcat/conf/server.xml
+.........
+       <Host name="www.a.com"  appBase="a"
+             unpackWARs="true" autoDeploy="true">
+       </Host>  
+       <Host name="www.b.com"  appBase="b"
+             unpackWARs="true" autoDeploy="true">
+       </Host>
+创建虚拟主机对应的页面和根目录
+[root@redhat ~]# mkdir -p /usr/local/tomcat/{a,b}/ROOT
+[root@redhat ~]# echo "AAAAA"  > /usr/local/tomcat/a/ROOT/index.html
+[root@redhat ~]# echo "BBBBB" > /usr/local/tomcat/b/ROOT/index.html
+重启Tomcat服务器：
+[root@redhat ~]# /usr/local/tomcat/bin/shutdown.sh 
+[root@redhat ~]# /usr/local/tomcat/bin/startup.sh 
+客户端设置hosts文件，解析域名
+[root@client ~]# vim /etc/hosts
+    192.168.4.5 www.a.com www.b.com
+访问测试：
+[root@client ~]# firefox http://www.a.com:8080
+[root@client ~]# firefox http://www.b.com:8080
+#####################################################
+修改www.b.com网站的首页目录为base
+使用docBase参数可以修改默认网站首页路径
+[root@redhat ~]# vim /usr/local/tomcat/conf/server.xml
+      <Host name="www.b.com"  appBase="b"
+            unpackWARs="true" autoDeploy="true">
+      <Context path="" docBase="base"/>
+      </Host>
+[root@redhat ~]# mkdir /usr/local/tomcat/b/base
+[root@redhat ~]# echo "base" > /usr/local/tomcat/b/base/index.html
+重启Tomcat服务器：
+[root@redhat ~]# /usr/local/tomcat/bin/shutdown.sh 
+[root@redhat ~]# /usr/local/tomcat/bin/startup.sh
+客户端访问：结果是base目录下的内容
+[root@client ~]# firefox http://www.b.com:8080
+###########################################################
+页面的调转：当用户访问http://www.a.com/test时打开/var/www/html目录下的页面
+[root@redhat ~]# vim /usr/local/tomcat/conf/server.xml 
+    <Host name="www.a.com"  appBase="a"
+            unpackWARs="true" autoDeploy="true">
+        <Context path="/test" docBase="/var/www/html/"/>
+    </Host> 
+[root@redhat ~]# echo "TEST" > /var/www/html/index.html
+[root@redhat ~]# /usr/local/tomcat/bin/shutdown.sh
+[root@redhat ~]# /usr/local/tomcat/bin/startup.sh
+客户端访问：结果应为：TEST
+[root@client ~]# firefox http://www.a.com:8080/test
+###########################################################
+配置Tomcat支持SSL加密网站
+创建加密用的私钥和证书文件
+[root@redhat ~]# keytool -genkeypair -alias tomcat -keyalg RSA -keystore /usr/local/tomcat/keystore
+输入密码123456 ，一路回车，输入是,回车输入密码
+   //-genkeypair  生成密钥对
+   //-alias tomcat 密钥别名
+   //-keyalg RSA 密钥算法
+   //-keystore 定义密钥文件存储路径为：/usr/local/tomcat/keystore
+[root@redhat ~]# ls /usr/local/tomcat/
+a    conf      LICENSE  RELEASE-NOTES  webapps
+b    keystore  logs     RUNNING.txt    work
+bin  lib       NOTICE   temp
+修改配置文件，使Tomcat支持加密
+[root@redhat ~]# vim /usr/local/tomcat/conf/server.xml
+ 85     <Connector port="8443" protocol="org.apache.coyote.http11.Http11NioProtocol"
+ 86          maxThreads="150" SSLEnabled="true" scheme="https" secure="true"
+ 87            keystoreFile="/usr/local/tomcat/keystore" keystorePass="123456"  
+ 88              clientAuth="false" sslProtocol="TLS" />
+重启Tomcat
+[root@redhat ~]# /usr/local/tomcat/bin/shutdown.sh
+[root@redhat ~]# /usr/local/tomcat/bin/startup.sh
+客户端测试访问：
+[root@client ~]# firefox https://www.a.com:8443/
+[root@client ~]# firefox https://www.b.com:8443/
+##############################################################
+配置Tomcat日志：为每个虚拟主机设置不同的日志文件
+[root@redhat ~]# vim /usr/local/tomcat/conf/server.xml
+     <Host name="www.b.com"  appBase="b"
+            unpackWARs="true" autoDeploy="true">
+        <Context path="" docBase="base"/>
+        <Valve className="org.apache.catalina.valves.AccessLogValve" directory="logs"
+               prefix="b_access_log" suffix=".txt"
+               pattern="%h %l %u %t &quot;%r&quot; %s %b" />
+      </Host>
+将www.a.com的日志文件代码复制一份加以修改给www.b.com
+重启Tomcat
+[root@redhat ~]# /usr/local/tomcat/bin/shutdown.sh
+[root@redhat ~]# /usr/local/tomcat/bin/startup.sh
+查看日志目录：
+[root@redhat ~]# ls /usr/local/tomcat/logs/
+a_access_log.2019-03-09.txt  host-manager.2019-03-09.log
+b_access_log.2019-03-09.txt  localhost.2019-03-09.log
+catalina.2019-03-09.log      localhost_access_log.2019-03-09.txt
+catalina.out                 manager.2019-03-09.log
+#############################################################################
+配置Tomcat集群：
+        
+                         客户端
+                           |
+                           |
+                 nginx调度器即代理服务器
+                     192.168.4.5
+                           |
+                           |
+              ————————————————————————————————————
+               |                              |
+               |                              |
+         后端Tomcat服务器               后端Tomcat服务器
+           192.168.2.100                  192.168.2.200
+
+在4.5主机上部署Nginx调度器
+[root@redhat ~]# vim  /usr/local/nginx/conf/nginx.conf
+    http{
+        upstream toms { #定义集群toms
+            server 192.168.2.100:8080;
+            server 192.168.2.200:8080;
+        }
+        server  {
+            listen 80;
+            server_name localhost;
+            location / {
+                proxy_pass  http://toms; #调用集群toms
+            }
+        }
+    }  
+Tomcat服务器的部署同上
+##############################################################
+
+
+
+
