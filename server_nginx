@@ -1,0 +1,63 @@
+部署lnmp环境:
+安装依赖:
+[root@centos ~]# yum -y install gcc openssl-devel pcre-devel
+源码包安装nginx
+[root@centos ~]# ls
+   nginx-1.12.2.tar.gz
+[root@centos ~]# tar -xvf nginx-1.12.2.tar.gz
+[root@centos ~]# cd nginx-1.12.2/
+[root@centos nginx-1.12.2]# ls
+auto  CHANGES  CHANGES.ru  conf  configure  contrib  html  LICENSE  man  README  src
+[root@centos nginx-1.12.2]# ./configure --user=nginx --group=nginx --with-http_ssl_module
+[root@centos nginx-1.12.2]# make && make install 
+[root@centos ~]# useradd nginx 
+[root@centos ~]# /usr/local/nginx/sbin/nginx 
+[root@centos ~]# netstat -tunlp | grep :80
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      28120/nginx: master 
+安装mariadb (光盘里有) #mariadb默认是无密码的
+[root@centos ~]# yum -y install mariadb mariadb-server mariadb-devel
+安装php php-fpm (要下载)
+[root@centos ~]# ls
+php-fpm-5.4.16-42.el7.x86_64.rpm
+[root@centos ~]# yum -y install php php-mysql
+[root@centos ~]# yum -y install php-fpm-5.4.16-42.el7.x86_64.rpm
+启动mariadb php-fpm
+[root@centos ~]# systemctl start mariadb
+[root@centos ~]# systemctl status mariadb
+[root@centos ~]# systemctl enable mariadb
+[root@centos ~]# systemctl start php-fpm
+[root@centos ~]# systemctl status php-fpm
+[root@centos ~]# systemctl enable php-fpm
+[root@centos ~]# firewall-cmd --set-default-zone=trusted
+[root@centos ~]# vim /etc/sysconfig/selinux 
+                       SELINUX=disabled
+修改nginx配置文件支持php页面
+location / {
+            root   html;
+            index  index.php index.html index.htm;
+        }
+location ~ \.php$ {
+            root           html;
+            fastcgi_pass   127.0.0.1:9000;
+            fastcgi_index  index.php;
+           #fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
+            include        fastcgi.conf;
+        }
+重启nginx
+[root@centos ~]# /usr/local/nginx/sbin/nginx -s reload
+创建测试页面，测试lnmp架构是否可用
+[root@centos ~]# vim /usr/local/nginx/html/test.php
+<?php
+$i="This is a test Page";
+echo $i;
+?>
+客户端访问：
+    http://192.168.122.184/test.php
+创建php测试页面 连接并查询mariadb数据库
+##################################################################
+nginx常见问题：
+nginx默认的访问日志：/usr/local/nginx/logs/access.log
+nginx默认的错误日志：/usr/local/nginx/log/error.log
+php默认的错误日志：/var/log/php-fpm/www-error.log
+tail -f /var/log/php-fpm/www-error.log 动态查看日志
+############################################################################
