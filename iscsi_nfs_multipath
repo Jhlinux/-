@@ -1,0 +1,219 @@
+    iscsi服务+ multipath多路径+ NFS共享
+   
+NAS:网络存储(文件系统) Samba nfs httpd ----> 不需要分区 挂载
+SAN:网络存储(块设备) iscsi  -------> 要分区 挂载 
+配置iscsi：
+proxy:iscsi服务器 192.168.4.5
+client:iscsi客户端 192.168.4.9
+
+[root@proxy ~]# yum -y install targetcli
+[root@proxy ~]# lsblk
+   vdb  252:16   0   20G  0 disk 
+[root@proxy ~]# parted /dev/vdb  mklabel gpt
+[root@proxy ~]# parted /dev/vdb mkpart primary 1 100%
+[root@proxy ~]# lsblk   
+vdb           252:16   0   20G  0 disk 
+└─vdb1        252:17   0   20G  0 part 
+使用targetcli定义后端存储
+[root@proxy ~]# targetcli
+/> backstores/block create store /dev/vdb1 #将/dev/vdb1设置为后端共享磁盘 store为任意名称
+创建iqn对象
+/> /iscsi create iqn.2018-01.cn.tedu:server1 #设置iscsi共享名客户端访问时要用
+
+设置acl访问控制：拥有iqn.2018-01.cn.tedu:client1 字段的客户端才能访问iscsi服务器
+/> iscsi/iqn.2018-01.cn.tedu:server1/tpg1/acls/ create iqn.2018-01.cn.tedu:client1
+
+绑定存储：将iqn共享名称（iqn.2018-01.cn.tedu:server1）与后端实际的存储设备（vdb）绑定
+/> iscsi/iqn.2018-01.cn.tedu:server1/tpg1/luns create /backstores/block/store
+
+存储绑定服务监听的地址 并保存配置
+/> iscsi/iqn.2018-01.cn.tedu:server1/tpg1/portals/ create 0.0.0.0
+/> saveconfig
+Last 10 configs saved in /etc/target/backup.
+Configuration saved to /etc/target/saveconfig.json
+/> exit
+#######################################################
+服务管理：
+[root@proxy ~]# systemctl start/stop target
+[root@proxy ~]# systemctl enable target
+[root@proxy ~]# ss -tunlp | grep :3260
+tcp    LISTEN     0      256       *:3260                  *:*                  
+关闭防火墙和selinux
+[root@proxy ~]# systemctl stop firewalld
+[root@proxy ~]# systemctl disable firewalld
+[root@proxy ~]# vim /etc/sysconfig/selinux
+     SELINUX=disabled
+[root@proxy ~]# reboot #使配置生效
+########################################################
+客户端配置：
+[root@client ~]# yum -y install iscsi-initiator-utils
+[root@client ~]# vim /etc/iscsi/initiatorname.iscsi
+InitiatorName=iqn.2018-01.cn.tedu:client1
+#必须和服务器上设置的acl一致
+发现远程存储：参考man iscsiadm
+[root@client ~]# iscsiadm --mode discoverydb --type sendtargets --portal 192.168.4.5 --discover
+192.168.4.5:3260,1 iqn.2018-01.cn.tedu:server1
+[root@client ~]#  iscsiadm --mode node --targetname iqn.2018-01.cn.tedu:server1 --portal 192.168.4.5:3260 --login
+[root@client ~]# lsblk
+sda             8:0    0   20G  0 disk
+[root@client ~]# systemctl restart iscsi
+分区 格式化 挂载
+[root@client ~]# parted /dev/sda mklabel gpt
+[root@client ~]# parted /dev/sda mkpart primary 1 800
+[root@client ~]# mkfs.xfs /dev/sda1
+[root@client ~]# mount /dev/sda1 /mnt
+       写点文件测试一下
+[root@client ~]# umount /mnt 
+################################################
+$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$
+部署Multipath多路径环境
+通过Multipath实现以下目标：
+    在共享存储服务器上配置iscsi 为应用服务器共享存储空间
+    应用服务器上配置iscsi 发现远程共享存储
+    应用服务器上配置Multipath 将相同的共享存储影射为同一个名称
+iscsi服务器：eth0:192.168.4.5/24
+             eth1:192.168.2.5/24
+iscsi客户端：eth0:192.168.4.9/24
+             eth1:192.168.2.100/24
+步骤：
+1 为存储服务器添加额外的磁盘并配置共享存储（省略）
+2 在客户端安装并配置iscsi客户端（省略）
+3 发现存储服务器的共享磁盘
+  有两条路都可以连接到共享存储 所以需要在两条路上都发现它
+[root@client ~]#  iscsiadm --mode discoverydb --type sendtargets --portal 192.168.2.5 --discover
+192.168.2.5:3260,1 iqn.2018-01.cn.tedu:client1
+[root@client ~]#  iscsiadm --mode discoverydb --type sendtargets --portal 192.168.4.5 --discover
+192.168.2.5:3260,1 iqn.2018-01.cn.tedu:client1
+4 登陆共享存储
+    将iscsi服务重启实现自动登陆（不需要login）
+[root@client ~]# service iscsi restart 
+[root@client ~]# lsblk #会发现多出两块新的硬盘
+5 设置开机自启动
+   iscsi 用于自动login远程存储 iscsid 是守护进程
+[root@client ~]# systemctl enable iscsid
+[root@client ~]# systemctl enable iscsi
+6 配置Multipath多路径
+  安装多路径软件包
+[root@client ~]# yum list | grep multipath
+device-mapper-multipath.x86_64   0.4.9-111.el7 Server
+device-mapper-multipath-libs.i686  0.4.9-111.el7  Server
+device-mapper-multipath-libs.x86_64  0.4.9-111.el7 Server
+
+[root@client ~]# yum -y install device-mapper-multipath
+  生成配置文件
+[root@client ~]# cd /usr/share/doc/device-mapper-multipath-0.4.9/
+[root@client device-mapper-multipath-0.4.9]# ls multipath.conf 
+        multipath.conf
+[root@client device-mapper-multipath-0.4.9]# cp multipath.conf  /etc/multipath.conf
+  获取wwid:登陆共享存储后 系统多了两块硬盘，这两块硬盘实际上是同一个存储设备，应用服务器使用哪个都可以，但是如果使用sdb时，sdb对应的链路出现故障，它不会自动切换到sda
+  为了能够实现系统自动选择使用那条链路，需要将这两块磁盘绑定为一个名称
+  通过磁盘的wwid来判断哪些磁盘是相同的
+获取一块磁盘wwid的方法：
+[root@client ~]# /usr/lib/udev/scsi_id --whitelisted --device=/dev/sda
+36001405f2df883e59a24b7ab76ee890f
+  修改配置文件：
+首先声明自动发现多路径：
+[root@client ~]# vim /etc/multipath.conf 
+ 23 defaults {
+ 24         user_friendly_names yes
+ 25         find_multipaths yes
+ 26 }
+然后在60行的位置加入多路径声明，如果哪个设备的wwid和上一步获取的wwid一样，那幺为其去一个别名 叫mpatha
+ 60 multipaths {
+ 61    multipath {
+ 62       wwid "36001405f2df883e59a24b7ab76ee890f"
+ 63       alias mpatha
+ 64    }
+ 65 }
+  启用Multipath多路径并测试
+如果前面实验已经挂载了iscsi设备，一定要先卸载再启动多路径
+[root@client ~]# systemctl start multipathd
+[root@client ~]# systemctl enable multipathd
+  检查多路径设备文件
+多路径启动成功，会在/dev/mapper下面生成名为mpatha的设备文件
+[root@client ~]# ls /dev/mapper/
+control  rhel-root  rhel-swap mpatha
+  对多路径设备文件执行分区，格式化，挂载
+如果前面已经对iscsi做过分区操作，这里可以直接识别到mpatha1(不需要再分区)
+  创建目录并挂载（如前面已经格式化，这里可以直接挂载）
+[root@client ~]# mkfs.xfs /dev/mapper/mpatha1
+[root@client ~]# mkdir /data
+[root@client ~]# mount /dev/mapper/mpatha1 /data/
+[root@client ~]# df -h /data/
+验证多路经
+[root@client ~]# multipath -rr
+关闭某个链路，在查看
+[root@client ~]# nmcli connection down eth1
+[root@client ~]# nultipath -rr
+####################################################
+配置并访问NFS共享
+将4.5主机的/root/目录共享给4.9主机，客户机的root用户有写权限
+将4.5主机的/usr/src目录共享给4.0网段，只开放读权限
+nfs服务器：192.168.4.5/24
+         |
+         |网关192.168.4.0/24
+         |
+linux客户机192.168.4.9/24
+nfs共享的配置文件：/etc/exports
+配制格式：共享文件夹路径  客户机地址1 客户机地址2....
+配置nfs服务器 发布共享目录
+[root@proxy ~]# yum -y install nfs-utils rpcbind
+软件包nfs-utils用来提供nfs共享服务及相关工具
+软件包rpcbind 用来提供RPC协议
+共享目录如下：
+[root@proxy ~]# ls -ld /root /usr/src
+dr-xr-x---. 22 root root 4096 3月   7 15:19 /root
+drwxr-xr-x.  5 root root   60 3月   6 19:58 /usr/src
+修改/etc/exports文件 添加共享目录设置
+[root@proxy ~]# vim /etc/exports
+   /root 192.168.4.9(rw,no_root_squash)
+   /usr/src 192.168.4.0/24(ro)
+no_root_squash 用来保留root的权限，否则root会被降级为普通用户
+[root@proxy ~]# systemctl restart rpcbind
+[root@proxy ~]# systemctl enable rpcbind
+[root@proxy ~]# systemctl restart nfs
+[root@proxy ~]# systemctl enable nfs
+查看本机发布的NFS共享目录列表
+[root@proxy ~]# showmount -e localhost
+Export list for localhost:
+/usr/src 192.168.4.0/24
+/root    192.168.4.9
+
+从客户机访问NFS
+[root@client ~]# yum -y install rpcbind
+[root@client ~]# systemctl restart rpcbind
+[root@client ~]# systemctl enable rpcbind
+[root@client ~]# showmount -e 192.168.4.5
+Export list for 192.168.4.5:
+/usr/src 192.168.4.0/24
+/root    192.168.4.9
+将远程4.5的共享目录挂载到本机的/root5目录下
+[root@client ~]# mkdir /root5
+[root@client ~]# mount 192.168.4.5:/root /root5
+[root@client ~]# df -hT /root5
+文件系统          类型  容量  已用  可用 已用% 挂载点
+192.168.4.5:/root nfs4   47G  5.7G   42G   12% /root5
+验证共享目录可读可写
+[root@client ~]# cd /root5/
+[root@client root5]# echo "NFShahaha" > test.txt
+[root@client root5]# cat test.txt 
+NFShahaha
+
+将nfs的/usr/src目录挂载到本机的/mnt/nfsdir并验证只读
+[root@client ~]# mkdir /mnt/nfsdir
+[root@client ~]# mount 192.168.4.5:/usr/src/ /mnt/nfsdir/
+[root@client ~]# df -hT /mnt/nfsdir/
+文件系统             类型  容量  已用  可用 已用% 挂载点
+192.168.4.5:/usr/src nfs4   47G  5.7G   42G   12% /mnt/nfsdir
+[root@client ~]# cd /mnt/nfsdir/
+[root@client nfsdir]# ls
+debug  inotify-tools-3.13  kernels
+[root@client nfsdir]# echo "hskda" > pc.txt
+-bash: pc.txt: 只读文件系统
+[root@client ~]# vim /etc/fstab 
+192.168.4.5:/root /root5 nfs default 0 0
+192.168.4.5:/usr/src /mnt/nfsdir nfs default,ro 0 0
+[root@client ~]# mount -a
+[root@client ~]# df -h 
+##################################################################
+

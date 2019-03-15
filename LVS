@@ -1,0 +1,207 @@
+ipvsadm命令：
+   ipvsadm -A  添加虚拟服务器
+   ipvsadm -E  修改虚拟服务器
+   ipvsadm -D  删除虚拟服务器
+   ipvsadm -C  清空所有
+   ipvsadm -a  添加真实服务器
+   ipvsadm -e  修改真实服务器
+   ipvsadm -d  删除真实服务器
+   ipvsadm -L  查看LVS规则表
+   -s rr/wrr/lc/wlc  指定集群算法 默认是加权轮询
+   -m 设置工作模式为NAT模式
+   -g 设置工作模式为DR模式 
+[jhh@proxy ~]$ sudo yum -y install ipvsadm
+创建LVS虚拟集群服务器
+[jhh@proxy ~]$ sudo ipvsadm -A -t 192.168.4.5:80 -s wrr
+查看集群信息
+[jhh@proxy ~]$ sudo ipvsadm -Ln
+IP Virtual Server version 1.2.1 (size=4096)
+Prot LocalAddress:Port Scheduler Flags
+  -> RemoteAddress:Port           Forward Weight ActiveConn InActConn
+TCP  192.168.4.5:80 wrr 
+为集群添加真实服务器--real server
+[jhh@proxy ~]$ sudo ipvsadm -a -t 192.168.4.5:80 -r 192.168.2.100 -m -w 1
+[jhh@proxy ~]$ sudo ipvsadm -a -t 192.168.4.5:80 -r 192.168.2.200 -m -w 2
+[jhh@proxy ~]$ sudo ipvsadm -a -t 192.168.4.5:80 -r 192.168.2.201 -m -w 3
+[jhh@proxy ~]$ sudo ipvsadm -a -t 192.168.4.5:80 -r 192.168.2.202 -m -w 4
+[jhh@proxy ~]$ sudo ipvsadm -Ln
+IP Virtual Server version 1.2.1 (size=4096)
+Prot LocalAddress:Port Scheduler Flags
+  -> RemoteAddress:Port           Forward Weight ActiveConn InActConn
+TCP  192.168.4.5:80 wrr
+  -> 192.168.2.100:80             Masq    1      0          0         
+  -> 192.168.2.200:80             Masq    2      0          0         
+  -> 192.168.2.201:80             Masq    3      0          0         
+  -> 192.168.2.202:80             Masq    4      0          0         
+修改集群服务器设置--修改条度算法，将加权轮询改为轮询
+[jhh@proxy ~]$ sudo ipvsadm -E -t 192.168.4.5:80 -s rr
+[jhh@proxy ~]$ sudo ipvsadm -Ln
+TCP  192.168.4.5:80 rr
+修改真实服务器 使用-g选项将模式改为DR模式
+[jhh@proxy ~]$ sudo ipvsadm -e -t 192.168.4.5:80 -r 192.168.2.200 -g
+[jhh@proxy ~]$ sudo ipvsadm -Ln
+创建另一个集群--算法为最少连接算法，使用-m 指定工作模式为NAT模式
+[jhh@proxy ~]$ sudo ipvsadm -A -t 192.168.4.5:3306 -s lc
+[sudo] jhh 的密码：
+[jhh@proxy ~]$ sudo ipvsadm -a -t 192.168.4.5:3306 -r 192.168.2.100 -m
+[jhh@proxy ~]$ sudo ipvsadm -a -t 192.168.4.5:3306 -r 192.168.2.101 -m 
+永久保存所有规则：
+[jhh@proxy ~]$ sudo ipvsadm-save -n > /etc/sysconfig/ipvsadm
+-bash: /etc/sysconfig/ipvsadm: 权限不够
+[jhh@proxy ~]$ su
+密码：
+[root@proxy jhh]# ipvsadm-save -n > /etc/sysconfig/ipvsadm
+清空所有规则：
+[root@proxy jhh]# ipvsadm -C
+[root@proxy jhh]# ipvsadm -Ln
+IP Virtual Server version 1.2.1 (size=4096)
+Prot LocalAddress:Port Scheduler Flags
+  -> RemoteAddress:Port           Forward Weight ActiveConn InActConn
+###########################################################################################################
+部署LVS-NAT集群
+使用LVS实现NAT模式的集群调度服务器，为用户提供web服务：
+   集群对外公网ip地址：192.168.4.5/24
+   集群对内ip ：192.168.2.5/24
+   真实web服务器：192.168.2.100/24
+                  192.168.2.200/24
+   使用加权轮询调度算法，真实服务器权重分别是1和2
+
+                  客户端
+            eth0:192.168.4.9/24
+                    |
+                    |
+                LVS调度器
+              eth0:192.168.4.5/24
+              eth1:192.168.2.5/24
+                    |
+                    |    
+       ————————————————————————————————————————
+        |                              |        
+        |                              |
+    真实服务器web1                 真实服务器web2
+    eth1:192.168.2.100/24          eth1:192.168.2.200/24
+web服务器的搭建省略
+部署LVS-NAT模式调度器
+开启调度器的路由转发功能：
+[root@proxy ~]# echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf   #永久设置
+创建集群服务器
+[jhh@proxy ~]$ sudo yum -y install ipvsadm
+[jhh@proxy ~]$ sudo ipvsadm -A -t 192.168.4.5:80 -s wrr
+添加真实服务器
+[jhh@proxy ~]$ sudo ipvsadm -a -t 192.168.4.5:80 -r 192.168.2.100 -w 1 -m
+[jhh@proxy ~]$ sudo ipvsadm -a -t 192.168.4.5:80 -r 192.168.2.200 -w 2 -m
+查看规则并保存规则
+[jhh@proxy ~]$ sudo ipvsadm -Ln
+[jhh@proxy ~]$ su
+密码：
+[root@proxy jhh]# ipvsadm-save -n > /etc/sysconfig/ipvsadm #保存规则
+客户端测试：
+   客户端使用curl命令反复连接http://192.168.4.5 查看访问的页面是否会轮询到不同的真实的服务器
+
+###############################################################################################################
+Keepalived高可用服务器：
+                       |
+                       |————————————web1服务器
+                       |            eth0:2.100
+                       |            VIP:2.80
+                       |
+       客户端  ————————|
+        2.5            |     
+                       |
+                       |____________web2服务器
+                       |            eth0:2.200
+                                    VIP:2.80
+web1和web2做服务器，并部署keepalived高可用软件
+客户端通过访问VIP地址访问web页面
+VIP：自动配置
+web1和web2配置详解：
+web服务器的搭建省略
+部署keepalived服务(以web1为例)
+[jhh@z-web1 ~]$ sudo yum -y install keepalived
+[jhh@z-web1 ~]$ sudo vim /etc/keepalived/keepalived.conf 
+global_defs {
+  notification_email {
+    admin@jhh.com.cn                //设置报警收件人邮箱
+  }
+  notification_email_from ka@localhost    //设置发件人
+  smtp_server 127.0.0.1                //定义邮件服务器
+  smtp_connect_timeout 30
+  router_id  z-web1                 //设置路由ID号（实验需要修改）
+}
+vrrp_instance VI_1 {
+  state MASTER     //主服务器为MASTER（备服务器需要修改为BACKUP）
+  interface eth0        //定义网络接口
+  virtual_router_id 50  //主备服务器VRID号必须一致
+  priority 100  //服务器优先级,优先级高优先获取VIP（实验需要修改）
+  advert_int 1
+  authentication {
+    auth_type pass
+    auth_pass 1111         //主备服务器密码必须一致
+  }
+  virtual_ipaddress { 192.168.4.80  }  
+       //谁是主服务器谁获得该VIP（实验需要修改）
+}
+[jhh@z-web1 ~]$ sudo systemctl start keepalived
+关闭防火墙和selinux
+启动keepalived时会自动添加一个drop的防火墙，需要清空
+[jhh@z-web1 ~]$ sudo iptables -F
+查看VIP信息：
+[jhh@z-web1 ~]$ ip addr show
+web2的配置和web1一样（省略）
+客户端访问测试：http://192.168.2.80查看web页面，关闭web1的网卡，再访问查看web页面
+###############################################################################################################
+Keepalived+LVS服务器
+  使用Keepalived为LVS调度器提供高可用功能，防止调度器单点故障
+
+                            客户端
+                               |
+                               |
+              ———————— ————————————————————————————
+                    |          |                |
+                    |          |                |
+               LVS1服务器      |             LVS2服务器
+               eth0:4.5/24     |             eth0:4.6/24
+               VIP:4.15        |             VIP:4.15
+                               |
+                               |
+              —————————————————————————————————————————
+                    |                            |
+                    |                            |
+                    |                            |
+                 web1服务器                   web2服务器
+                 eth0:4.100/24                 eth0:4.200/24
+                 VIP:4.15/32                   VIP:4.15/32
+
+web1和web2要配置VIP地址4.15/32，即子网掩码全是255
+web1：eth0 :192.168.4.100/24
+web1的VIP配置：
+[jhh@z-web1 ~]$ cd /etc/sysconfig/network-scripts/
+[jhh@z-web1 network-scripts]$ sudo cp ifcfg-lo ifcfg-lo:0
+[jhh@z-web1 network-scripts]$ sudo vim ifcfg-lo:0
+DEVICE=lo:0
+IPADDR=192.168.4.15
+NETMASK=255.255.255.255
+NETWORK=192.168.4.15
+# If you're having problems with gated making 127.0.0.0/8 a martian,
+# you can change this to something else (255.255.255.255, for example)
+BROADCAST=192.168.4.15
+ONBOOT=yes
+NAME=lo:0
+
+这里因为web1也配置与调度器一样的VIP地址，默认会出现地址冲突，写入以下四行的主要目的就是访问192.168.4.15的数据包，只有调度器会响应，其他主机都不做任何响应
+[jhh@z-web1 ~]$ sudo vim /etc/sysctl.conf 
+net.ipv4.conf.all.arp_ignore=1
+net.ipv4.conf.lo.arp_ignore=1
+net.ipv4.conf.lo.arp_announce=2
+net.ipv4.conf.all.arp_announce=2
+
+[jhh@z-web1 ~]$ sudo systemctl restart network
+[jhh@z-web1 ~]$ ifconfig 
+lo:0: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
+        inet 192.168.4.15  netmask 255.255.255.255
+        loop  txqueuelen 1  (Local Loopback)
+关闭防火墙和selinux(省略)
+
+web2的配置和web1一样
+
+

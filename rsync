@@ -1,0 +1,145 @@
+          rsync    rsync+ssh    rsync+inotifywait
+rsync同步工具的常用选项：
+      -n  测试同步过程 不做实际修改
+      --delete 删除目标文件夹内多余的文档
+      -a  归档模式
+      -v  显示详细操作信息
+      -z  传输过程中启用压缩或解压
+rsync同步的基本操作：
+1 将目录/boot同步到目录/todir下：
+[root@proxy ~]# ls -l /todir #同步前查看
+ls: 无法访问/todir: 没有那个文件或目录
+[root@proxy ~]# rsync -a /boot /todir 
+[root@proxy ~]# ls -l /todir  #同步后查看
+总用量 4
+[root@proxy ~]# ls /todir/
+boot
+2 将目录/boot下的文档同步到目录/todir下
+[root@proxy ~]# rsync -a /boot/ /todir
+当同步的源文件内包含文件夹时 若缺少-a 或-r选项 则文件夹会被忽略
+###############################################################
+rsync+ssh同步：
+列出远程主机的ssh资源
+1 查看远程主机2.200的/目录下有哪些子目录：
+[root@proxy ~]# rsync root@192.168.2.200:/
+dr-xr-xr-x         244 2018/01/12 16:19:24 .
+-rw-r--r--           0 2018/01/12 16:19:24 .autorelabel
+lrwxrwxrwx           7 2018/01/10 16:32:58 bin
+lrwxrwxrwx           7 2018/01/10 16:32:58 lib
+lrwxrwxrwx           9 2018/01/10 16:32:58 lib64
+lrwxrwxrwx           8 2018/01/10 16:32:58 sbin
+dr-xr-xr-x        4096 2018/01/10 16:55:07 boot
+drwxr-xr-x        3220 2019/03/06 09:09:35 dev
+drwxr-xr-x        8192 2019/03/06 13:05:23 etc
+drwxr-xr-x          21 2018/01/10 16:54:26 home
+.................省略.....
+2 从远程主机2.200下载/etc/passwd文件到当前目录
+[root@proxy ~]# rsync root@192.168.2.200:/etc/passwd ./
+[root@proxy ~]# ls
+               passwd    
+3 将远程主机2.200的/boot目录同步为本地的/fromssh
+[root@proxy ~]# rsync -a root@192.168.2.200:/boot/ /fromssh
+[root@proxy ~]# ls /fromssh/
+config-3.10.0-693.el7.x86_64
+efi
+grub2
+initramfs-0-rescue-8788a090be00435f8cbaff7ad68c518f.img
+initramfs-3.10.0-693.el7.x86_64.img
+initrd-plymouth.img
+.......省略
+4 将本地的/etc目录同步到远程主机2.200的/opt/下
+[root@proxy ~]# rsync -a /etc root@192.168.2.200:/opt/
+[root@web2 ~]# ls /opt/
+etc 
+########################################################
+inotifywait监控操作的常用命令：
+      -m  持续监控（捕获一个事件后不退出）
+      -r  递归监控，包括子目录及文件
+      -q  减少屏幕输出信息
+      -e  指定监视的modify move create delete attrib等事件类别
+安装inotify-tools软件包
+[root@proxy ~]# ls
+inotify-tools-3.13.tar.gz
+[root@proxy ~]# tar -xvf inotify-tools-3.13.tar.gz -C /usr/src/
+[root@proxy ~]# cd /usr/src/inotify-tools-3.13/
+[root@proxy inotify-tools-3.13]# ls
+aclocal.m4    configure     libinotifytools  NEWS
+AUTHORS       configure.ac  ltmain.sh        README
+ChangeLog     COPYING       Makefile.am      src
+config.guess  depcomp       Makefile.in
+config.h.in   INSTALL       man
+config.sub    install-sh    missing
+[root@proxy inotify-tools-3.13]# ./configure 
+[root@proxy inotify-tools-3.13]# make && make install 
+[root@proxy ~]# inotifywait --help
+inotifywait 3.13
+测试监控：
+开启监控任务放入后台：
+[root@proxy ~]# inotifywait -mrq -e create,modify,move,attrib,delete /opt &
+[1] 15897
+观察新建文件时的监控信息：
+[root@proxy ~]# touch /opt/a.txt
+/opt/ CREATE a.txt
+/opt/ ATTRIB a.txt
+观察修改文件内容时的监控信息
+[root@proxy ~]# echo hello > /opt/a.txt 
+[root@proxy ~]# /opt/ MODIFY a.txt
+/opt/ MODIFY a.txt
+bash: /opt/: 是一个目录
+观察改文件名时的监控信息
+[root@proxy ~]# mv /opt/a.txt /opt/b.txt
+/opt/ MOVED_FROM a.txt
+/opt/ MOVED_TO b.txt
+观察修改文件权限时的监控信息
+[root@proxy ~]# chmod 600 /opt/b.txt 
+/opt/ ATTRIB b.txt
+观察删除文件时的监控信息
+[root@proxy ~]# rm -rf /opt/b.txt 
+/opt/ DELETE b.txt
+停止监控任务
+[root@proxy ~]# kill -9 %1
+################################################################
+配置web镜像同步：
+本例要求为两台web服务器4.5 2.200的网页文档目录配置镜像同步 主要基于inotifywait监控技术实现实时触发操作 
+   以4.5为发起点，原始目录为/var/www/html/
+   以2.200为同步目标，基于ssh免密验证
+   编写inotifywait+rsync同步脚本 验证实时同步效果
+inotifywait与rsync的结合 主要思路：
+     while  inotifywait监控操作
+     do
+          需要执行的rsync同步操作 
+     done
+确认4.5目录内容：
+[root@proxy ~]# ls /var/www/html
+he  ks.cfg
+确认2.200的目录内容：
+[root@client ~]# ls /var/www/html #初始目录为空
+[root@client ~]# 
+为4.5配置免密登陆2.200(省略)
+编写镜像同步脚本并测试效果
+[root@proxy ~]# vim /root/rsync.sh
+#!/bin/bash
+from_dir="/var/www/html/"
+rsync_cmd="rsync -az --delete $from_dir root@192.168.2.200:/var/www/html"
+while inotifywait -rqq -e modify,move,create,delete,attrib $from_dir
+do
+    $rsync_cmd
+done &
+[root@proxy ~]# chmod +x /root/rsync.sh 
+运行脚本
+[root@proxy ~]# /root/rsync.sh 
+查看进程信息
+[root@proxy ~]# pgrep -l inotify
+16228 inotifywait
+测试同步效果
+向4.5的/var/www/html/目录下添加一个测试页面（触发同步）
+[root@proxy ~]# ls /var/www/html/
+a.txt  he  ks.cfg
+在2.200上检查/var/www/html目录
+[root@client ~]# ls /var/www/html
+a.txt  he  ks.cfg
+结束测试 在4.5上停止监控任务
+[root@proxy ~]# pkill -9 inotify
+[root@proxy ~]# pgrep -l inotify #确认没有监控任务
+[root@proxy ~]# 
+###########################################################

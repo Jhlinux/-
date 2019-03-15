@@ -1,0 +1,199 @@
+rehl7  firewalld
+rehl6  iptables
+关闭firewalld
+[root@mysql51 ~]# systemctl stop firewalld
+[root@mysql51 ~]# systemctl disable firewalld
+安装iptables并启动服务
+[root@mysql51 ~]# yum -y install iptables-services
+[root@mysql51 ~]# systemctl start iptables
+[root@mysql51 ~]# systemctl enable iptables
+[root@mysql51 ~]# systemctl status  iptables
+
+开启内核的IP转发：作为网关，路由的必要条件
+  echo 'net.ipv4.ip_forward=1' >> /etc/sysctl.conf
+或者
+  echo 1 > /proc/sys/net/ipv4/ip_forward
+
+iptables防火墙的组成：
+      4表：表是功能分类
+           raw--状态跟踪表  mangle--包标记表 
+           nat--地址转换表  filter表--过滤表(默认)
+      5链：链是数据表传输的方向
+           INPUT ：匹配进入防火墙本机的数据包
+           OUTPUT ：匹配从防火墙本机出去的数据包
+           FORWARD ：匹配经过防火墙本机的数据包
+           POSTROUTING ：路由后
+           PREROUTING ：路由前
+       每条链内有多条匹配规则：
+使用iptables管理防火墙服务：
+]# iptables -t 表名 选项 链名 条件 -j 目标操作
+   常用选项：
+      -A 在链的末尾追加一条规则
+      -I 在链的开头(或指定序号)插入一条规则
+      -L 列出所有的规则
+      -n 以数字形式显示地址，端口等信息
+      --line-numbers 查看规则时，显示规则的序号
+      -D 删除链内指定序号的一条规则
+      -F 清空所有的规则
+      -P 为指定的链设置默认规则
+ 不指定表名时，默认为filter表
+ 不指定链名时，默认为所有链
+   条件的表示：
+      基本的匹配条件：
+         -p 协议名
+         -s 源地址，-d 目标地址
+         -i 收数据的网卡，-o 发数据的网卡
+         --sport 源端口，--dport 目标端口
+         --icmp-type ICMP类型
+         要取反条件时，用叹号！
+   目标操作类型：
+         ACCEPT：允许通过/放行
+         DROP：直接丢弃，不给任何回应
+         REJECT：拒绝通过，必要时会给提示
+         LOG：记录日志，然后传给下一条规则
+[root@mysql51 ~]# iptables -nL
+[root@mysql51 ~]# iptables -nL INPUT --line-numbers
+[root@mysql51 ~]# iptables -t nat -nL --line-numbers
+[root@mysql51 ~]# iptables -t nat -nL INPUT --line-numbers
+
+清空表规则：
+[root@mysql51 ~]# iptables -t filter -F
+[root@mysql51 ~]# iptables -t nat -F
+[root@mysql51 ~]# iptables -t mangle -F
+[root@mysql51 ~]# iptables -t raw -F
+
+查看表规则：
+[root@mysql51 ~]# iptables -t filter -nL
+[root@mysql51 ~]# iptables -t raw -nL
+[root@mysql51 ~]# iptables -t nat -nL
+[root@mysql51 ~]# iptables -t mangle -nL
+
+添加规则：
+[root@mysql51 ~]# iptables -t filter -A INPUT -p tcp -j ACCEPT
+[root@mysql51 ~]# iptables -t filter -nL INPUT --line-numbers
+
+[root@mysql51 ~]# iptables -I INPUT -p udp -j ACCEPT
+[root@mysql51 ~]# iptables -t filter -nL  INPUT --line-numbers
+
+[root@mysql51 ~]# iptables -I INPUT 2 -p icmp -j ACCEPT
+[root@mysql51 ~]# iptables -t filter -nL  INPUT --line-numbers
+
+[root@mysql51 ~]# iptables -D INPUT 1
+[root@mysql51 ~]# iptables -t filter -nL INPUT --line-numbers
+
+[root@mysql51 ~]# iptables -F INPUT
+[root@mysql51 ~]# iptables -t filter -nL INPUT --line-numbers
+
+[root@mysql51 ~]# iptables -F INPUT
+[root@mysql51 ~]# iptables -t filter -P FORWARD DROP
+[root@mysql51 ~]# iptables -t filter -nL
+
+[root@mysql51 ~]# iptables -t filter -P FORWARD ACCEPT
+[root@mysql51 ~]# iptables -t filter -nL
+#############################################################
+filter表控制：（主机型防火墙和网络型防火墙）
+      主机型防火墙：在服务器本机运行防火墙服务
+         filter ----> INPUT
+
+允许真机连接51虚机
+[root@mysql51 ~]# iptables -t filter -A INPUT -s 192.168.4.254 -p tcp --dport 22 -j ACCEPT
+[root@mysql51 ~]# iptables -t filter -P INPUT DROP
+[root@mysql51 ~]# iptables -t filter -A INPUT -p tcp --dport 80 -j ACCEPT
+[root@mysql51 ~]# iptables -t filter -A INPUT -p tcp --dport 8080 -j ACCEPT
+[root@mysql51 ~]# iptables -t filter -A INPUT -p tcp --dport 21 -j ACCEPT
+[root@mysql51 ~]# iptables -t filter -A INPUT -p icmp -j ACCEPT
+
+ping操作的请求包类型叫echo-request
+ping操作的应答包类型叫echo-reply
+[root@mysql51 ~]# iptables -t filter -A INPUT -p icmp --icmp-type echo-reply -j ACCEPT
+
+[root@mysql51 ~]# iptables -t filter -I INPUT -p tcp -m multiport --dport 22,80,8080,3306 -j ACCEPT
+[root@mysql51 ~]# iptables -t filter -D INPUT 2
+[root@mysql51 ~]# iptables -t filter -D INPUT 2
+[root@mysql51 ~]# iptables -t filter -D INPUT 2
+[root@mysql51 ~]# iptables -t filter -D INPUT 2
+[root@mysql51 ~]# iptables -t filter -nL INPUT --line-numbers
+[root@mysql51 ~]# iptables -t filter -A INPUT -p icmp --icmp-type echo-request -m iprange --src-range 192.168.4.51-192.168.4.56 -j ACCEPT
+###########################################################
+      网络型防火墙（防火墙服务主机部署在2个网络之间）
+        filter -----> FORWARD
+
+ifdown eth0 关闭eth0网卡
+sudo ip addr add 192.168.2.50/24 dev eth1 配ip
+nmcli connection add con-name eth1 ifname eth1 type ethernet 添加网卡eth1
+
+50上：eth0 4.50     eth1 2.50
+[root@redhat ~]# systemctl stop NetworkManager 
+[root@redhat ~]# route add default gw 192.168.4.50 设网关
+[root@redhat ~]# route del default gw 192.168.4.50 删除网关
+[root@redhat ~]# route -n 查看网关
+[root@redhat ~]# sysctl -a | grep net.ipv4.ip_forward
+查看内核ip路由转发功能
+
+51：eth0
+[root@mysql51 ~]# ifconfig  eth0
+[root@mysql51 ~]# systemctl stop NetworkManager
+[root@mysql51 ~]# route add default gw 192.168.4.50
+[root@mysql51 ~]# route -n
+
+52:eth0
+[root@mysql52 ~]# ifconfig eth0
+[root@mysql52 ~]# systemctl stop NetworkManager
+[root@mysql52 ~]# route add default gw 192.168.4.50
+[root@mysql52 ~]# route -n
+
+53:eth1 2.53
+[root@mysql53 ~]# ifconfig eth1
+  192.168.2.53  
+[root@mysql53 ~]# sudo ip addr add 192.168.2.53/24 dev eth1
+[root@mysql53 ~]# systemctl stop NetworkManager
+[root@mysql53 ~]# route add default gw 192.168.2.50
+############################################################
+防火墙服务器50上的规则：
+放行 80端口服务
+[root@redhat ~]# iptables -t filter -A FORWARD -p tcp --dport 80 -j ACCEPT #放行访问
+[root@redhat ~]# iptables -t filter -A FORWARD -p tcp --sport 80 -j ACCEPT #放行应答
+51和52访问测试：
+   [root@mysql51 ~]# curl http://192.168.2.53/test.html
+放行22端口服务：
+[root@redhat ~]# iptables -t filter -A FORWARD -p tcp --dport 22 -j ACCEPT
+[root@redhat ~]# iptables -t filter -A FORWARD -p tcp --sport 22 -j ACCEPT
+53上 测试放行：
+    [root@mysql53 ~]# ssh root@192.168.4.51
+
+
+nat表典型应用（所有局域网内容的主机共享同一个公网ip地址上网）
+53主机删除网关：模拟公网
+[root@mysql53 ~]# route del default gw 192.168.2.50
+[root@mysql53 ~]# route -n
+[root@mysql53 ~]# echo web 53333 > /var/www/html/test2.html
+[root@mysql53 ~]# netstat -tunlp | grep :80
+
+50主机：防火墙服务器
+[root@redhat ~]# iptables -t filter -F FORWARD 
+[root@redhat ~]# iptables -t filter -P FORWARD ACCEPT
+[root@redhat ~]# iptables -t nat -F
+[root@redhat ~]# iptables -t nat -nL 
+
+51和52主机：内网
+ifconfig eth0
+[root@mysql51 ~]# route -n
+   192.168.4.50
+[root@mysql52 ~]# route -n
+   192.168.4.50
+###################################################
+nat例子：
+50上：
+[root@redhat ~]# iptables -t nat -A  POSTROUTING -s 192.168.4.0/24 -p tcp --dport 80 -j SNAT --to-source 192.168.2.50
+[root@redhat ~]# iptables -t nat -nL POSTROUTING
+53抓包：
+[root@mysql53 ~]# tcpdump -i eth1 port 80
+51或52访问测试：
+[root@mysql52 ~]# curl http://192.168.2.53/test2.html
+web 53333
+#####################################################
+数据流向及匹配：
+   规则链之间的顺序：
+        入站：PREROUTING  ————> INPUT
+        出站：OUTPUT ————————> POSTROUTING
+        转发：PREROUTING —————> FORWARD -----> POSTROUTING
