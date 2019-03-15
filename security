@@ -1,0 +1,478 @@
+             安全与监控 
+[root@proxy jhh]# chage -l jhh #查看用户信息
+[root@proxy jhh]# chage -E 2088-3-7 jhh #设置用户的过期时间
+[root@proxy jhh]# passwd -S jhh #查看账户状态
+jhh PS 2019-03-06 0 99999 7 -1 (密码已设置，使用 SHA512 算法。)
+[root@proxy jhh]# passwd -l jhh #锁定账户
+锁定用户 jhh 的密码 。
+passwd: 操作成功
+[root@proxy jhh]# passwd -S jhh
+jhh LK 2019-03-06 0 99999 7 -1 (密码已被锁定。)
+[root@proxy jhh]# passwd -u jhh #解锁
+解锁用户 jhh 的密码。
+passwd: 操作成功
+与用户相关的文件：
+  /etc/passwd   /etc/shadow  
+  /etc/login.defs   
+  /etc/skel/有一些隐藏文件：
+      创建新用户时 系统会把这些文件同步到该用户的家目录下
+[root@proxy ~]# cp pssh-2.3.1-5.el7.noarch.rpm /etc/skel/
+[root@proxy ~]# ls /etc/skel/
+pssh-2.3.1-5.el7.noarch.rpm
+[root@proxy ~]# useradd tom
+[root@proxy ~]# passwd tom
+[root@room9pc01 ~]# ssh -X tom@192.168.4.5
+tom@192.168.4.5's password: 
+[tom@proxy ~]$ ls 
+pssh-2.3.1-5.el7.noarch.rpm
+############################################################
+隐藏系统版本和内核版本
+伪装登陆提示：
+[root@proxy jhh]# vim /etc/issue #隐藏自己的系统信息
+welcome my system
+[root@proxy jhh]# vim /etc/issue.net
+welcome my system
+[root@proxy jhh]# vim /etc/redhat-release 
+  this is redhat
+锁定和解锁保护文件系统
+chattr +i 文件名   锁定文件(无法修改 删除 移动) 可以拷贝
+chattr -i 文件名   解锁文件
+chattr +a 文件名   锁定文件后仅可追加
+chattr -a 文件名   解锁文件
+lsattr 文件名      查看文件特殊属性
+[root@proxy jhh]# chattr +i /etc/passwd 
+[root@proxy jhh]# lsattr /etc/passwd
+----i----------- /etc/passwd
+[root@proxy jhh]# rm -rf /etc/passwd
+rm: 无法删除"/etc/passwd": 不允许的操作
+禁用非必要的服务
+redhat7 : systemctl 
+redhat6 : chkconfig httpd on #开机自起
+          chkconfig httpd off #开机不自起
+##########################################################
+用户切换与提权
+[root@proxy jhh]# su - jhh
+上一次登录：三 3月  6 10:25:10 CST 2019pts/0 上
+[jhh@proxy ~]$ su
+密码：
+[root@proxy jhh]# 
+用户提权：
+   主配置文件 /etc/sudoers
+    vim /etc/sudoers
+        92 root    ALL=(ALL)       ALL
+        93 jhh     ALL=(ALL)       ALL
+[jhh@proxy ~]$ sudo ls /root/
+[sudo] jhh 的密码：
+anaconda-ks.cfg  ks.cfg	  pxe.sh  视频  音乐
+bin   test    图片  桌面     host.txt 
+ nginx-1.12.2.tar.gz	   公共    文档
+initial-setup-ks.cfg  
+pssh-2.3.1-5.el7.noarch.rpm  模板    下载
+提权实例：
+[root@proxy ~]# useradd dachui
+[root@proxy ~]# passwd dachui
+[root@proxy ~]# vim /etc/sudoers
+94 dachui localhost,proxy=/usr/bin/vim /etc/httpd/conf/httpd.conf,/usr/bin/systemctl * httpd
+:wq!   proxy是当前终端主机名
+[root@proxy~]# sudo -l  #查看提权信息
+[root@proxy ~]# su - dachui
+[dachui@proxy ~]$ sudo systemctl restart httpd
+[dachui@proxy ~]$ sudo systemctl status httpd
+启用日志：
+[root@proxy ~]# vim /etc/sudoers
+   Defaults logfile="/var/log/sudo"
+###########################################################
+ssh的配置：
+[root@proxy ~]# vim /etc/ssh/sshd_config
+17 Port 22222
+38 PermitRootLogin no #禁止root用户登陆
+   AllowUsers root@192.168.4.254  jhh 
+   DenyUsers root  #拒绝root连接
+[root@proxy ~]# systemctl  restart sshd
+[root@room9pc01 ~]# ssh -p 22222 jhh@192.168.4.5
+[root@room9pc01 ~]# ssh -p 22222 root@192.168.4.5
+口令 密钥对认证：
+[root@proxy ~]# vim /etc/ssh/sshd_config
+          PasswordAuthentication yes
+       43 #PubkeyAuthentication yes
+       47 AuthorizedKeysFile      .ssh/authorized_keys
+       65 PasswordAuthentication no 
+############################################################
+selinux：
+查看selinux状态：sestatus
+查看安全上下文：ps aux -Z | grep -i httpd
+                ls -ldZ /root
+恢复正确的安全上下文属性：
+    ]# restorecon  /var/www/html/a.html
+    ]# restorecon -R /var/www/html
+#################################################################
+调整selinux的布尔值：
+   布尔值：功能开关
+   查看selinux布尔值：
+       ]# getsebool -a 
+       ]# getsebool -a | grep -i mysqld
+   设置selinux的布尔值：
+       ]# setsebool -P 选项 off/on
+例子：启用selinux后，允许客户端访问4.5主机的ftp服务，匿名用户对服务器的/var/ftp/sharedir有上传和下载文件权限：
+服务端：
+启用selinux(建议关闭)
+[root@proxy ~]# vim /etc/sysconfig/selinux 
+SELINUX=permissive
+[root@proxy ~]# reboot
+[root@proxy ~]# setenforce 1
+[root@proxy ~]# getsebool -a | grep ftp
+ftpd_anon_write --> off
+ftpd_full_access --> off
+[root@proxy ~]# setsebool ftpd_anon_write on
+[root@proxy ~]# setsebool ftpd_full_access on
+#################################################
+[root@proxy ~]# yum -y install vsftpd
+[root@proxy ~]# vim /etc/vsftpd/vsftpd.conf
+    29 anon_upload_enable=YES #允许匿名用户上传文件
+       anonymous_enable=YES   //开启匿名访问
+       anon_mkdir_write_enable=YES  //允许上传目录
+[root@proxy ~]# mkdir /var/ftp/sharedir
+[root@proxy ~]# chmod o+w /var/ftp/sharedir
+[root@proxy ~]# cp /etc/passwd /var/ftp/sharedir/  
+[root@proxy ~]# systemctl restart vsftpd
+[root@proxy ~]# netstat -utnlp | grep :21
+客户端：
+[root@client ~]# yum -y install ftp
+[root@client ~]# ftp 192.168.4.5 #登陆4.5的ftp
+name:ftp
+Password:默认无密码
+ftp> cd sharedir
+ftp> get passwd
+ftp> lcd /etc #进入/etc/
+ftp> put hosts #上传/etc/hosts 文件到4.5的/var/ftp/sharedir目录下 #要修改selinux允许匿名用户上传文件
+在4.5上查看
+[root@proxy ~]# ls /var/ftp/sharedir/
+hosts  passwd
+###########################################
+gpg简介：对称加解密软件
+[root@proxy ~]# ls
+ks.cfg   
+加密：
+[root@proxy ~]# gpg -c ks.cfg  #要设密码
+[root@proxy ~]# ls
+ks.cfg                   
+ks.cfg.gpg 
+[root@proxy ~]# scp ks.cfg.gpg root@192.168.4.9:/root/
+[root@client ~]# ls
+       ks.cfg.gpg 
+解密：
+[root@client ~]# gpg -d ks.cfg.gpg > my.txt
+[root@client ~]# cat my.txt 
+#################################################
+gpg非对称加解密
+使用密钥对 对数据进行加密
+公钥加密 私钥解密
+创建密钥对：主机4.9
+[root@client ~]# gpg --gen-key
+密钥对密码：1234567890   用户名：client
+[root@client ~]# ls .gnupg/
+gpg.conf           pubring.gpg  secring.gpg
+private-keys-v1.d  random_seed  S.gpg-agent
+[root@client ~]# gpg -a --export > /tmp/client.pub #导出公钥
+[root@client ~]# scp /tmp/client.pub root@192.168.4.5:/root/
+[root@proxy ~]# ls /root/
+client.pub  
+导入公钥：主机4.5
+[root@proxy ~]# gpg --import /root/client.pub 
+[root@proxy ~]# ls /root/.gnupg/
+gpg.conf     pubring.gpg~  trustdb.gpg
+pubring.gpg  secring.gpg
+##################################################
+非对称加密解密实例：对4.5主机的/root目录下的host.txt文件加密，用4.9主机解密
+加密：
+[root@proxy ~]# gpg -e host.txt #回车后输入client
+[root@proxy ~]# scp host.txt.gpg root@192.168.4.9:/root
+解密：
+[root@client ~]# gpg -d host.txt.gpg > a.txt
+[root@client ~]# cat a.txt 
+root@host1
+host2
+host3
+###################################################
+gpg数字签名：保证数据的完整性（基于上例）
+client:使用私钥做数字签名，共享签名文件和原文件
+proxy: 使用公钥验证签名
+[root@client ~]# gpg -b  a.txt #做签名
+[root@client ~]# scp a.txt* root@192.168.4.5:/root
+[root@proxy ~]# gpg --verify a.txt.sig #验证签名 
+#####################################################
+aide入侵检测：
+[root@proxy ~]# yum -y install aide
+配置文件：/etc/aide.conf
+[root@proxy ~]# sed -i '99,312s/^/#/' /etc/aide.conf #注释默认检测目录
+[root@proxy ~]# vim /etc/aide.conf
+313 /root/ FIPSR #自定义检测目录
+生成数据库文件：
+[root@proxy ~]# aide --init
+AIDE, version 0.15.1
+
+### AIDE database at /var/lib/aide/aide.db.new.gz initialized.
+
+[root@proxy ~]# ls /var/lib/aide/
+aide.db.new.gz
+[root@proxy ~]# mv /var/lib/aide/aide.db.new.gz /var/lib/aide/aide.db.gz 
+对检测目录做一些操作：如加些文件 删除文件
+[root@proxy ~]# aide --check #入侵检测
+#######################################################################################
+断网命令：arpspoof -i eth0 -t 192.168.4.10 192.168.4.1
+说明一下：eth0是我的网卡，192.168.4.10是要攻击的ip 192.168.4.1是网关
+###########################################################
+nmap简介：一款强大的网络探测利器，支持多种探测技术，如ping扫描，多端口扫描，TCP/IP指纹校验等
+[root@proxy ~]# yum -y install nmap
+[root@proxy ~]# nmap -sP 176.233.27.10-100
+[root@proxy ~]# nmap -sP 192.168.4.10-100
+[root@proxy ~]# nmap -sP 192.168.4.0/24
+[root@proxy ~]# nmap -sP 192.168.4.9,17,20
+[root@proxy ~]# nmap -sS -n 192.168.4.51
+[root@proxy ~]# nmap -sS -p 80 192.168.4.9
+[root@proxy ~]# nmap -sS -p 80,3306 192.168.4.9
+[root@proxy ~]# nmap -sS -p 21-80,3306 192.168.4.9
+[root@proxy ~]# nmap -A -n 192.168.4.9
+####################################################################
+抓包：tcpdump
+[root@proxy ~]# yum -y install tcpdump
+tcpdump常用选项 :   -i 指定网络接口
+                 -c 指定抓包个数
+                 -A 将抓到的数据包转为ASSC码
+                 -w 将抓到的包保存到以.cap结尾的文件中
+[root@proxy ~]# tcpdump -i eth0 -c 2 
+[root@proxy ~]# tcpdump -i eth0 -c 3 -A 
+[root@proxy ~]# tcpdump -i eth0 -c 3 -A -w /tmp/jhh.cap
+[root@proxy ~]# cat /tmp/jhh.cap
+根据过滤条件抓包：
+   类型：host net port portrange 
+   方向：src dst
+   协议：tcp udp ip wlan arp icmp
+   多个条件组合：and or not
+[root@proxy ~]# tcpdump -i eth0 icmp
+[root@proxy ~]# tcpdump -i eth0 icmp and host 192.168.4.9
+[root@proxy ~]# tcpdump -i eth0 tcp port 80 and host 192.168.4.9
+抓包的图形工具：
+[root@proxy ~]# yum -y install wireshark-gnome
+############################################################################
+配置审计
+安装audit软件---提供审计服务
+  -->主配置文件： /etc/audit/auditd.conf
+     日志文件： /var/log/audit/audit.log                           
+[root@redhat ~]# yum -y install audit
+[root@redhat ~]# cat -b /var/log/audit/audit.log #-b 添加行号
+查看服务状态：----这个服务无法停止
+[root@redhat ~]# systemctl status auditd
+[root@redhat ~]# systemctl enable auditd
+临时定义审计规则：
+[root@redhat ~]# which fdisk
+/usr/sbin/fdisk
+[root@redhat ~]# auditctl -w /usr/sbin/fdisk -p x -k disk_one
+查看审计规则
+[root@redhat ~]# auditctl -l  #查看审计规则
+-w /usr/sbin/fdisk -p x -k disk_one
+[root@redhat ~]# auditctl -w /etc/passwd -p rw -k passwd_change
+定义永久审计规则：
+[root@redhat ~]# vim  /etc/audit/rules.d/audit.rules
+-w /usr/sbin/fdisk -p x -k disk_one
+-w /etc/passwd -p rw -k passwd_change
+测试 定义的审计规则：
+审计日志分析：
+搜索审计日志：ausearch命令默认检索审计日志目录
+[root@redhat ~]# ausearch -k disk_one
+[root@redhat ~]# ausearch -k passwd_change
+[root@redhat ~]# tailf /var/log/audit/audit.log
+[root@redhat ~]# auditctl -D #删除所有审计规则
+###########################################################
+服务安全：
+网站安全：nginx服务 tomcat服务 mariadb数据库服务
+nginx服务安全：
+     安装nginx:
+[root@redhat nginx-1.12.2 ~]# ./configure --prefix=/usr/local/nginx --user=nginx --group=nginx 
+[root@redhat nginx-1.12.2 ~]# make && make install
+[root@redhat ~]# useradd nginx
+[root@redhat ~]# vim /usr/local/nginx/conf/nginx.conf
+server {
+        listen       80;
+        server_name  localhost;
+        autoindex on;
+        #启用自动索引功能，这个功能一旦开启会暴露所有页面文件，不安全
+}
+[root@redhat ~]# /usr/local/nginx/sbin/nginx -t #测试nginx的配置文件
+[root@redhat ~]# /usr/local/nginx/sbin/nginx
+[root@redhat ~]# netstat -tunlp | grep :80
+编译时去除自动索引功能：
+[root@redhat nginx-1.12.2 ~]# ./configure --prefix=/usr/local/nginx --user=nginx --group=nginx --without-http_autoindex_module #禁用自动索引功能
+nginx版本信息的优化：
+优化前：
+[root@client ~]# curl -I http://192.168.4.50/ 
+HTTP/1.1 200 OK
+Server: nginx/1.12.2
+Content-Type: text/html
+Connection: keep-alive
+优化方法：
+[root@redhat ~]# cd nginx-1.12.2/
+[root@redhat nginx-1.12.2]# cd src/http/
+[root@redhat http]# ls
+ngx_http_header_filter_module.c
+[root@redhat http]# vim +48 ngx_http_header_filter_module.c
+static u_char ngx_http_server_string[] = "Server: Jbob" CRLF;
+static u_char ngx_http_server_full_string[] = "Server:Jbob " NGINX_VER CRLF;
+static u_char ngx_http_server_build_string[] = "Server:Jbob " NGINX_VER_BUILD CRLF;
+再编译安装nginx （省略）
+改配置文件：
+[root@redhat ~]# vim /usr/local/nginx/conf/nginx.conf
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+server_tokens off; #隐藏版本信息
+[root@redhat ~]# /usr/local/nginx/sbin/nginx  -s reload
+在客户端访问查看：
+[root@client ~]# curl -I http://192.168.4.50/
+HTTP/1.1 200 OK
+Server: Jbob
+Content-Type: text/html
+Connection: keep-alive
+限制并发量：nginx提供了ngx_http_limit_req_module模块，可以控制并发连接数
+
+配置nginx服务，拒绝非法请求
+[root@redhat ~]# vim /usr/local/nginx/conf/nginx.conf
+只允许get或post请求，其他的都拒绝
+server {
+       if ($request_method !~ ^(GET|POST)$){
+                  return 444;
+        }
+[root@redhat ~]# /usr/local/nginx/sbin/nginx -s reload
+客户端访问测试：
+[root@client ~]# curl -I -X GET http://192.168.4.50/
+HTTP/1.1 200 OK
+Server: Jbob
+Date: Fri, 08 Mar 2019 06:18:00 GMT
+Content-Type: text/html
+[root@client ~]# curl -I -X HEAD http://192.168.4.50/
+curl: (52) Empty reply from server
+
+防止 nginx服务运行时，buffer溢出
+当客户端连接服务器时，服务器会启用各种缓存，用来存放连接的状态信息，如果客户端发送大量的连接请求，而服务器不做限制的话，内存可能会溢出（内存不足）
+[root@redhat ~]# vim /usr/local/nginx/conf/nginx.conf
+http {
+client_body_buffer_size  1K;
+client_header_buffer_size 1k;
+client_max_body_size 1k;
+large_client_header_buffers 2 1k;
+........
+}
+[root@redhat ~]# /usr/local/nginx/sbin/nginx  -s reload
+
+压力测试：
+ ]# ab -c 100 -n 100 http://192.168.4.5/
+
+mariadb数据库的安全优化
+[root@redhat ~]# yum -y install mariadb mariadb-server
+[root@redhat ~]# systemctl start mariadb
+[root@redhat ~]# systemctl enable mariadb
+[root@redhat ~]# netstat -tunlp |grep mysqld
+[root@redhat ~]# mysql_secure_installation
+回车  设密码
+Remove anonymous users? [Y/n] y #移除匿名用户
+Disallow root login remotely? [Y/n] Y #拒绝root远程登陆
+Reload privilege tables now? [Y/n] Y #重载配置
+[root@redhat ~]# mysql -u root -p123456
+修改root密码
+[root@redhat ~]# mysqladmin -hlocalhost -u root -p password "654321" 新密码
+Enter password:旧密码
+登陆状态改密码
+MariaDB [(none)]> set password for root@"localhost"=password("123456");
+[root@redhat ~]# cat ~/.mysql_history #这个文件存放所有的sql命令，要定期清除或加密
+
+[root@redhat ~]# history -c #清空当前终端的历史记录
+
+tomcat安全：
+安装tomcat
+[root@redhat ~]# tar -xzvf apache-tomcat-8.0.30.tar.gz
+[root@redhat ~]# mv apache-tomcat-8.0.30 /usr/local/tomcat
+[root@redhat ~]# ls /usr/local/tomcat
+bin   lib      logs    RELEASE-NOTES  temp     work
+conf  LICENSE  NOTICE  RUNNING.txt    webapps
+[root@redhat ~]# /usr/local/tomcat/bin/startup.sh
+[root@redhat ~]# netstat -tunlp | grep :8080
+tcp6       0      0 :::8080                 :::*                    LISTEN      11998/java  
+[root@redhat ~]# echo "ABC" > /usr/local/tomcat/webapps/ROOT/test.html
+[root@redhat ~]# curl http://192.168.4.50:8080/test.html
+ABC
+隐藏版本：
+[root@redhat ~]# yum -y install java-1.8.0-openjdk-devel
+[root@redhat ~]# cd /usr/local/tomcat/lib/
+[root@redhat lib]# jar -xf catalina.jar
+[root@redhat lib]# vim ./org/apache/catalina/util/ServerInfo.properties 
+server.info=cobller
+server.number=最新版
+[root@redhat lib]# vim /usr/local/tomcat/conf/server.xml
+69     <Connector port="8080" protocol="HTTP/1.1"
+ 70                connectionTimeout="20000"
+ 71                redirectPort="8443" server="cobbler"/>
+[root@redhat lib]# /usr/local/tomcat/bin/shutdown.sh
+[root@redhat lib]# /usr/local/tomcat/bin/startup.sh
+[root@redhat lib]# netstat -tulpn | grep :8080
+[root@redhat lib]# curl -I http://192.168.4.50:8080/test.html
+
+[root@redhat lib]# useradd tomcat
+[root@redhat lib]# chown -R tomcat:tomcat /usr/local/tomcat
+[root@redhat lib]# su - -c "/usr/local/tomcat/bin/startup.sh" tomcat
+设置源码包开机自起
+[root@redhat lib]# vim /etc/rc.local 
+su - -c "/usr/local/tomcat/bin/startup.sh" tomcat
+##########################################################
+Linux安全之打补丁：
+例子1：对文件打补丁
+50主机：
+mkdir /demo
+cd /demo
+vim v1.sh
+#/bin/bash
+echo "hello boy"
+
+51主机：
+mkdir /demo
+
+50主机：
+scp /demo/v1.sh root@192.168.4.51:/demo/
+cd /demo
+cp v1.sh v1_1.sh
+vim v1_1.sh
+#/bin/bash
+echo "hello boy"
+echo "hello girl"
+diff -u v1.sh v1_1.sh > one.patch #创建补丁文件
+scp /demo/v1_1.sh root@192.168.4.51:/demo/
+
+51主机：
+cd /demo
+yum -y install patch
+which patch
+patch -pO -i one.patch 打补丁
+cat v1.sh
+
+例子2：对目录打补丁
+50主机：
+cd /demo
+rm -rf *
+mkdir {source1,source2}
+yum -y install tree
+echo "hello word" > source1/test.sh
+echo "hello the word" > source2/test.sh
+tree /demo
+which find
+cp /usr/bin/find source1/
+cp /usr/bin/find source2/
+echo "1" > source2/find
+diff -uraN /demo/source1 /demo/source2 > /root/jhh.patch
+scp -r source1 root@192.168.4.51:/demo/
+scp /root/jhh.patch root@192.168.4.51:/ 放到哪都行
+
+51主机：
+cd /demo
+patch -p2 -i /jhh.patch 
+
+
+
