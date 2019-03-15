@@ -10,7 +10,8 @@ nova主机：nova.tedu.cn
           private2---eth1 :192.168.4.11/24
 配置yum仓库：镜像下载地址--- ftp://149.248.16.96/iso
 将下载的三个镜像作为这两台机器的yum仓库
-
+关闭selinux
+卸载firewalld和NetworkManager-*
 两台主机配置静态ip和主机名：
 以openstack主机为例：
 [root@localhost ~]# echo openstack.tedu.cn > /etc/hostname
@@ -76,7 +77,12 @@ allow 0/0   //允许所有人使用我的时间服务器
   11 CONFIG_DEFAULT_PASSWORD=centos  //密码
   42 CONFIG_SWIFT_INSTALL=n
   75 CONFIG_NTP_SERVERS=192.168.1.254   //时间服务器的地址
- 554 CONFIG_CINDER_VOLUMES_CREATE=y    //创建卷,已经手动创建过了可以改为n
+
+  这两行是openstack主机远程安装nova时的配置
+  98:  CONFIG_COMPUTE_HOSTS=192.168.1.10,192.168.1.11
+  102: CONFIG_NETWORK_HOSTS=192.168.1.10,192.168.1.11 
+ 
+554 CONFIG_CINDER_VOLUMES_CREATE=y    //创建卷,已经手动创建过了可以改为n
  840 CONFIG_NEUTRON_ML2_TYPE_DRIVERS=flat,vxlan   //驱动类型
  876 CONFIG_NEUTRON_ML2_VXLAN_GROUP=239.1.1.5  
     //设置组播地址,最后一个随意不能为0和255,其他固定
@@ -92,7 +98,7 @@ anaconda-ks.cfg  answer.ini  keystonerc_admin
 
 openstack安装完成后默认是不能访问的，修改以下配置即可访问
 vim /etc/httpd/conf.d/15-horizon_vhost.conf
-      WSGIApplicationGroup %${GLOBAL}
+      WSGIApplicationGroup %{GLOBAL}
  :wq
 systemctl restart httpd
 或
