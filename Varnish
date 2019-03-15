@@ -1,0 +1,53 @@
+使用Varnish加速web
+通过配置Varnish服务器实现如下目标：
+      使用Varnish加速后端web服务
+      利用缓存机制提高网站的响应速度
+      使用varnishadm命令管理缓存页面
+      使用varnishstat命令查看Varnish状态
+
+  客户端---------代理服务器 ---------交换机--------web服务器
+ eth0:4.10        eth0:4.5                          eth1:2.100
+                  eth1:2.5
+按上图配好ip地址并关闭防火墙和selinux
+web服务器：部署httpd或nginx或tomcat（省略）
+代理服务器：安装varnish
+安装依赖软件：
+[root@redhat ~]# yum -y install gcc readline-devel
+[root@redhat ~]# yum -y install ncurses-devel
+[root@redhat ~]# yum -y install pcre-devel
+[root@redhat ~]# ls
+  varnish-5.2.1.tar.gz
+  python-docutils-0.11-0.2.20130715svn7687.el7.noarch.rpm
+[root@redhat ~]# yum -y install python-docutils-0.11-0.2.20130715svn7687.el7.noarch.rpm 
+[root@redhat ~]# useradd -s /sbin/nologin varnish
+[root@redhat ~]# tar -xvf varnish-5.2.1.tar.gz 
+[root@redhat ~]# cd varnish-5.2.1/
+[root@redhat varnish-5.2.1]# ./configure
+[root@redhat varnish-5.2.1]# make && make install
+[root@redhat varnish-5.2.1]# cp etc/example.vcl /usr/local/etc/default.vcl
+[root@redhat ~]# vim /usr/local/etc/default.vcl
+backend default {
+    .host = "192.168.2.100";#后端服务器的ip和端口
+    .port = "80";
+}
+启动varnish服务默认端口：80
+[root@redhat ~]# varnishd -f /usr/local/etc/default.vcl 
+[root@redhat ~]# netstat -tunlp | grep :80
+tcp  0  0 0.0.0.0:80  0.0.0.0:*    LISTEN      1635/varnishd       
+tcp6 0  0 :::80       :::*         LISTEN      1635/varnishd  
+varnishd命令的其他选项：
+    varnishd -s malloc,128M 
+        定义varnish使用内存作为缓存，空间为128M
+    varnishd -s file,/var/lib/varnish_storage.bin,1G
+        定义varnish使用文件作为缓存
+客户端访问测试：
+     curl http://192.168.4.5
+查看varnish日志：
+[root@redhat ~]# varnishlog #varnish日志
+[root@redhat ~]# varnishncsa #访问日志
+清空缓存数据：
+[root@redhat ~]# varnishadm
+varnish> ban req.url ~.*
+//清空缓存数据，支持正则表达式
+#########################################################
+
