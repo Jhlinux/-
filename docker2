@@ -1,0 +1,151 @@
+自定义docker镜像：
+  方法一：
+[root@centos-190 ~]# docker images
+[root@centos-190 ~]# docker run -it centos
+[root@8c55da086c0c yum.repos.d]# cd /etc/yum.repos.d/
+[root@8c55da086c0c yum.repos.d]# rm -rf * 
+[root@8c55da086c0c yum.repos.d]# vi centos.repo
+[centos]
+name=centos
+baseurl=ftp://192.168.1.254/cent
+gpgcheck=0
+enable=1
+
+[root@8c55da086c0c ~]# yum -y install net-tools vim psmisc git 
+[root@8c55da086c0c ~]# exit
+[root@centos-190 ~]# docker commit 8c55da086c0c myos:latest 制作镜像
+[root@centos-190 ~]# docker images
+REPOSITORY   TAG         IMAGE ID            CREATED             SIZE
+myos        latest     f454e38c470d        7 minutes ago       310.8 MB
+centos      latest     e934aafc2206        11 months ago       198.6 MB
+   方法二：创建dockerfile
+docker的语法格式：
+         FROM 基础镜像
+         EXPOSE 开放的端口
+         ENV 设置环境变量
+         ADD 复制文件到镜像
+         RUN 制作镜像时执行的命令，可以有多个
+         WORKDIR 定义容器默认的工作目录
+         CMD 容器启动时执行的命令，仅可以有一条CMD
+[root@centos-190 ~]# mkdir myos2
+[root@centos-190 ~]# cd myos2/
+[root@centos-190 myos2]# cp /etc/yum.repos.d/centos.repo  ./
+[root@centos-190 myos2]# touch dockerfile
+[root@centos-190 myos2]# ls
+centos.repo  dockerfile
+[root@centos-190 myos2]# vim dockerfile 
+FROM centos:latest
+RUN rm -rf /etc/yum.repos.d/*
+ADD centos.repo /etc/yum.repos.d/centos.repo
+RUN yum install -y net-tools vim psmisc git 
+[root@centos-190 myos2]# docker build -t myos2:latest .
+Complete!
+ ---> f010b713eb7c
+Removing intermediate container 226eaaa94a27
+Successfully built f010b713eb7c
+[root@centos-190 myos2]# docker images
+REPOSITORY   TAG      IMAGE ID      CREATED             SIZE
+myos2       latest   f010b713eb7c  15 seconds ago      327.5 MB
+##############################################################################################
+使用dockerfile创建httpd服务：
+[root@centos-190 ~]# mkdir myos3
+[root@centos-190 ~]# cd  myos3 
+[root@centos-190 myos3]# cp /etc/yum.repos.d/centos.repo  ./
+[root@centos-190 myos3]# vim dockerfile
+FROM myos2:latest
+RUN yum -y install httpd
+ENV ENvironmentFile=/etc/sysconfig/httpd
+EXPOSE 80
+EXPOSE 443
+CMD ["/usr/sbin/httpd","-DFOREGROUND"]
+WORKDIR /var/www/html
+RUN echo "hello word" > index.html
+##################################################################################################
+[root@centos-105 ~]# find / | grep httpd.service
+/usr/lib/systemd/system/httpd.service
+[root@centos-105 ~]# cat /usr/lib/systemd/system/httpd.service
+[Service]
+Type=notify
+EnvironmentFile=/etc/sysconfig/httpd
+ExecStart=/usr/sbin/httpd $OPTIONS -DFOREGROUND
+ExecReload=/usr/sbin/httpd $OPTIONS -k graceful
+ExecStop=/bin/kill -WINCH ${MAINPID}
+######################################################################################################
+[root@centos-190 myos3]# docker build -t myos3:httpd . #构建httpd服务的镜像
+[root@centos-190 myos3]# docker images
+REPOSITORY          TAG                 IMAGE ID            CREATED             SIZE
+myos3               httpd               677d1bddf727        16 seconds ago      380.7 MB
+myos2               latest              f010b713eb7c        About an hour ago   327.5 MB
+[root@centos-190 myos3]# docker run -itd myos3:httpd #运行服务镜像要用 -itd
+7d12259f36eeaf1154f72290f7538c31abe57dcc00aa095e72cc8ff9e9fa5512
+[root@centos-190 myos3]# docker exec -it  7d122 /bin/bash
+[root@7d12259f36ee html]# netstat -tunlp | grep :80
+tcp6       0      0 :::80    :::*    LISTEN      1/httpd             
+[root@7d12259f36ee html]# curl http://localhost
+hello word
+####################################################################
+创建私有镜像仓库：
+[root@centos-190 ~]# vim /etc/docker/daemon.json
+{
+     "insecure-registries" : ["192.168.1.190:5000"]
+}
+[root@centos-190 ~]# systemctl restart docker
+[root@centos-190 ~]# docker run -itd -p 5000:5000 registry
+6f6af85979844c53181511dba74a625d630960462bdabb71b3a86a06369ac04c
+[root@centos-190 ~]# docker tag myos2:latest 192.168.1.190:5000/myos2:latest 
+[root@centos-190 ~]# docker push 192.168.1.190:5000/myos2:latest
+[root@centos-190 ~]# docker images
+192.168.1.190:5000/myos2   latest  f010b713eb7c   4 hours ago   327.5 MB
+registry   latest   d1fd7d86a825  14 months ago       33.26 MB
+[root@centos-190 ~]# curl http://192.168.1.190:5000/v2/_catalog
+{"repositories":["myos2"]}
+[root@centos-190 ~]# curl http://192.168.1.190:5000/v2/myos2/tags/list
+{"name":"myos2","tags":["latest"]}
+#####################################################################
+显示仓库中所有镜像
+  curl http://192.168.1.190:5000/v2/_catalog
+显示镜像的所有的标签：
+  curl http://192.168.1.190:5000/v2/镜像名/tags/list
+####################################################################
+NFS共享存储
+                         NFS服务器
+                        192.168.1.100
+                             |
+                             |
+                ——————————————————————————————————————
+                   |                              |
+                   |                              |
+               docker1                        docker2
+              192.168.1.190                192.168.1.105
+配置NFS服务器：
+yum -y install nfs-utils
+mkdir /content
+vim /etc/exports
+/content     *(rw，no_root_squash)
+systemctl restart nfs-server
+systemctl restart nfs-secure
+chmod 777 /content
+echo 11 > /content/index.html
+#####################################################
+docker1的配置：docker2的配置与docker1一样
+yum -y install nfs-utils
+systemctl restart nfs-server
+showmount -e 192.168.1.100
+   Export list for 192.168.1.100:
+   /content *
+mkdir /mnt/qq
+mount -t nfs 192.168.1.100:/content /mnt/qq
+ls /mnt/qq
+index.html
+cat  /mnt/qq/index.html 
+11
+docker run  -d -p 80:80 -v /mnt/qq:/var/www/html -it centos:latest
+      224248f0df5d795457c43c2a7dad0b7e5ec86abdc3f31d577e72f7929f020e01
+curl 192.168.1.190
+11
+touch /mnt/qq/a.sh
+echo 22 > /mnt/qq/index.html
+ls  /mnt/qq/
+    a.sh  index.html
+cat /mnt/qq/index.html 
+22

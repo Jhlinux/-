@@ -1,0 +1,167 @@
+docker简介：
+1 什么是docker 
+     docker是一个开源的应用容器引擎，基于Go语言并遵循Apache2.0协议开源，源代码部署在Github上
+     docker是通过内核虚拟技术来提供容器的资源隔离与安全保证，由于docker通过操作系统层的虚拟化实现隔离，所以docker容器在运行时，不需要类似虚拟机额外的操作系统开销，从而提高资源的利用率
+     docker的目标是实现轻量级的操作系统虚拟化解决方案
+2 docker的工作模式：
+     docker对于操作者来说是C/S架构，但是docker后端是一个非常耦合的架构，模块各司其职，并有机组合，支撑docker的运行
+     用户通过docker客户端与docker守护进程建立通信，并发送请求给docker守护进程
+3 docker可以干啥
+    1）Simplifying Configuration
+       简化配置：统一配置，通过镜像快速启动
+    2）Code Pipeline Management
+       代码流水线管理：
+  开发环境-->测试环境-->预生产环境-->灰度发布-->正式发布，docker在这里可以快速实现迁移
+    3）Developer Productivity
+       提高开发效率：对开发人员来说，有了镜像，直接启动容器即可
+    4）App lsolation
+       隔离应用：虚拟机的完全隔离会占用资源，docker会比较节约资源
+    5）Server Consolidation
+       服务器整合：同一台服务器可以跑多个docker容器，提高服务器的利用率
+    6）Debugging Capablities
+       调试能力：docker提供了很多的工具，提供了很多功能，这些可以帮助调试bug
+    7）Multi-tenancy
+       多租户：一个租户多个用户，类似于 阿里云的一个project下多个用户
+    8）Rapid Deployment
+       快速部署：不需要启动操作系统，实现妙级部署
+4 为什么要使用docker
+    更快捷的交付和部署
+    更高效的虚拟化
+    更轻松的迁移和扩展
+    更简单的管理
+5 docker的3大核心概念
+    1）镜像image
+         docker镜像就像是一个只读的模板，例如一个镜像可以包含一个完整的操作系统环境，里面安装了Apache或用户需要的其他应用程序
+         镜像可以用来创建容器，docker提供了一个很简单的机制来创建镜像或者更新现有的镜像，用户甚至可以从其他人那里下载一个已经做好的镜像来直接使用
+    2）容器container
+          docker利用容器来运行应用，容器是从镜像创建的运行实例，他可以启动，停止，开始，删除，每个容器都是相互隔离的，保证平台的安全
+           可以把容器看成一个简易版的linux系统和运行在其中的应用程序，镜像是只读的，容器在启动的时候会创建一层可写层作为最上层
+     3）仓库repository
+          仓库就是集中存放镜像的地方，有时候会把仓库和仓库注册器混成一块，并不严格区分，仓库注册器上往往存放着多个仓库，每个仓库又包含着多个镜像，每个镜像又有不同的tag(标签)
+          仓库分为公开仓库和私有仓库两种，最大的公开仓库是Docker Hub,提供了数量庞大的镜像供用户下载，国内的公开仓库包括Docker Pool等，可以提供大陆用户更稳定，更快的访问
+
+docker的部署：
+配置yum 仓库
+[root@room9pc01 ~]# mkdir /var/ftp/docker
+[root@room9pc01 ~]# ls
+ docker-engine-1.12.1-1.el7.centos.x86_64.rpm        
+ docker-engine-selinux-1.12.1-1.el7.centos.noarch.rpm
+[root@room9pc01 ~]# cd /var/ftp/docker
+[root@room9pc01 docker]# createrepo .  #产生repodata
+docker-engine-1.12.1-1.el7.centos.x86_64.rpm          repodata
+docker-engine-selinux-1.12.1-1.el7.centos.noarch.rpm
+##########################################################################
+安装docker ---要配置静态ip 关闭防火墙及SELinux（省略）内核版本3.0以上
+[root@centos-190 ~]# cd /etc/yum.repos.d/
+[root@centos-190 yum.repos.d]# vim docker.repo
+[dockker]
+name=docker
+baseurl=ftp://192.168.1.254/docker
+gpgcheck=0
+enable=1
+[root@centos-190 ~]# yum -y install docker-engine
+[root@centos-190 ~]# systemctl restart docker
+[root@centos-190 ~]# systemctl enable docker
+Created symlink from /etc/systemd/system/multi-user.target.wants/docker.service to /usr/lib/systemd/system/docker.service.
+[root@centos-190 ~]# ifconfig 
+docker0: flags=4099<UP,BROADCAST,MULTICAST>  mtu 1500
+        inet 172.17.0.1  netmask 255.255.0.0  broadcast 0.0.0.0
+        ether 02:42:8c:c5:d8:ab  txqueuelen 0  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+[root@centos-190 ~]# docker version #查看docker版本
+Client:
+ Version:      1.12.1
+ API version:  1.24
+ Go version:   go1.6.3
+ Git commit:   23cf638
+ Built:        
+ OS/Arch:      linux/amd64
+
+Server:
+ Version:      1.12.1
+ API version:  1.24
+ Go version:   go1.6.3
+ Git commit:   23cf638
+ Built:        
+ OS/Arch:      linux/amd64
+##########################################################################
+docker 镜像常用命令：
+[root@centos-105 ~]# docker images #查看已有的镜像
+[root@centos-105 ~]# docker search + 镜像名 #搜索镜像
+[root@centos-105 ~]# docker pull + 镜像名 #下载镜像
+[root@centos-190 ~]# docker push + 镜像名 #上传镜像
+[root@centos-190 ~]# docker search -f is-official=true + 镜像名 #只搜索官方的
+[root@centos-190 ~]# man docker search #查看docker search 命令的选项
+[root@centos-190 ~]# docker save busybox:latest -o busybox.tar #备份docker镜像
+[root@centos-190 ~]# ls
+  busybox.tar
+[root@centos-105 ~]# docker load <busybox.tar #导入docker镜像
+[root@centos-105 ~]# docker images #查看docker镜像
+REPOSITORY    TAG         IMAGE ID       CREATED             SIZE
+busybox      latest     d8233ab899d4    4 weeks ago         1.199 MB
+[root@centos-105 ~]# docker rmi busybox #删除docker镜像
+[root@centos-190 ~]# docker history centos #查看容器的制作历史
+[root@centos-190 ~]# docker inspect centos #查看镜像的详细信息
+[root@centos-190 ~]# docker tag centos:latest centos:lated #修改镜像标签
+########################################################################
+docker 容器常用命令：
+启动一个容器：
+[root@centos-190 ~]# docker run -it ubuntu:latest /bin/bash
+[root@centos-105 ~]# docker run -itd centos:latest #在后台起一个centos
+[root@centos-190 ~]# docker run -it centos:latest /bin/bash
+[root@centos-190 ~]# docker run -d nginx  //启动nginx服务的镜像
+[root@centos-190 ~]# docker ps    //查看后台运行的容器
+启动 关闭docker:
+[root@centos-105 ~]# docker ps
+CONTAINER ID  IMAGE  COMMAND  CREATED     STATUS          PORTS         NAMES
+de00e3428f35  centos:latest  "/bin/bash"  55 seconds ago Up 53 seconds angry_stallman
+[root@centos-105 ~]# docker stop de00e3428f35
+de00e3428f35
+[root@centos-105 ~]# docker ps
+CONTAINER ID        IMAGE               COMMAND             CREATED             STATUS              PORTS               NAMES
+[root@centos-105 ~]# docker start de00e3428f35
+[root@centos-105 ~]# docker ps -aq #查看所有运行的docker，只显示其id号
+de00e3428f35
+1c686b798f01
+删除容器时，要先将容器关闭
+[root@centos-105 ~]# docker stop de00e3428f35 
+de00e3428f35
+[root@centos-105 ~]# docker rm de00e3428f35 
+de00e3428f35
+[root@centos-105 ~]# docker run -itd centos:latest
+d287836f918d8e73de3440bd05b10a28f93a2907cfab6a1a8068ee70862c603f
+[root@centos-105 ~]# ps
+  PID TTY          TIME CMD
+ 3221 pts/0    00:00:00 bash
+ 3449 pts/0    00:00:00 ps
+[root@centos-105 ~]# docker exec -it d287836f9 /bin/bash #进入容器
+[root@d287836f918d /]# ls
+anaconda-post.log  dev  home  lib64  mnt  proc  run   srv  tmp  var
+bin                etc  lib   media  opt  root  sbin  sys  usr
+[root@centos-190 ~]# docker ps
+CONTAINER ID        IMAGE      COMMAND             CREATED             STATUS              PORTS        NAMES
+368d675b43d1        centos    "/bin/bash"         7 minutes ago       Up 7 minutes                      high_ride
+[root@centos-190 ~]# docker top 368 #查看进程列表
+UID    PID                 PPID     C    STIME     TTY        TIME                CMD
+root   6593                6579     0    21:03     pts/1   
+############################################################################################################
+使用docker运行httpd服务：
+搜索docker映像:
+[root@centos-105 ~]# docker search httpd
+下载docker映像：
+[root@centos-105 ~]# docker pull httpd
+查看本机docker映像：
+[root@centos-105 ~]# docker images
+REPOSITORY      TAG        IMAGE ID            CREATED             SIZE
+httpd         latest      94af1f614752        4 days ago  
+[root@centos-105 ~]# cd /data/
+[root@centos-105 data]# vim index.html
+<h1>abcd</h1>
+[root@centos-105 data]# docker run -it -d -p 80:80 -v /data/:/usr/local/apache2/htdocs/ httpd
+[root@centos-105 ~]# docker ps
+[root@centos-105 data]# ifconfig 
+docker0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 172.17.0.1  netmask 255.255.0.0  broadcast 0.0.0.0
+[root@centos-105 data]# curl http://172.17.0.1
+<h1>abcd</h1>
+

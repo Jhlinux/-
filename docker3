@@ -1,0 +1,44 @@
+创建自定义网桥：
+     创建网桥设备docker01
+     设定网段为10.10.10.0/24
+     启动nginx容器，nginx容器桥接docker01设备
+     映射真机8080端口与容器的80端口
+创建docker01虚拟交换机（桥设备）
+[root@centos-190 ~]# docker network create --subnet=10.10.10.0/24 docker01
+ea017ffa35af17c5b0704314bf08f0afd963fae76dcc7a13a8ee67ff85caf256
+[root@centos-190 ~]# docker network list #查看桥设备
+NETWORK ID          NAME                DRIVER              SCOPE
+4fb8c3002f64        bridge              bridge              local               
+ea017ffa35af        docker01            bridge              local               
+5fd022fb558c        host                host                local               
+94e591fe6a20        none                null                local   
+[root@centos-190 ~]# ifconfig 
+br-ea017ffa35af: flags=4099<UP,BROADCAST,MULTICAST>  mtu 1500
+        inet 10.10.10.1  netmask 255.255.255.0  broadcast 0.0.0.0
+        ether 02:42:a6:1f:8b:06  txqueuelen 0  (Ethernet)
+        RX packets 112  bytes 14150 (13.8 KiB)
+[root@centos-190 ~]# docker network inspect docker01 #查看docker01的详细信息
+####################################################################################################
+使用自定义网桥启动容器
+[root@centos-190 ~]# docker run --network=docker01 -id nginx
+355973b0e762d1341a8b08cd9beb336b24d568018161055a7f709b1e11427b0d
+端口映射：将容器的80端口映射给宿主机的8080端口
+[root@centos-190 ~]# docker run -p 8080:80 -id nginx 
+cdc85cbbf42eab44818b9b5703fe197f34d766733cd2050b67b7b0dbde66041c
+[root@centos-190 ~]# curl 192.168.1.190:8080
+<!DOCTYPE html>
+<html>
+<head>
+<title>Welcome to nginx!</title>
+<style>
+..............
+#######################################################
+创建docker03 
+[root@centos-190 ~]# docker network create docker03 --subnet=192.168.5.0/24 -o com.docker.network.bridge.name=docker03
+ff052bf0c1c9119f3d38d098e8cb7e8f457e0dd4fb6d0d892301fc6424aada08
+[root@centos-190 ~]# ifconfig 
+docker03: flags=4099<UP,BROADCAST,MULTICAST>  mtu 1500
+        inet 192.168.5.1  netmask 255.255.255.0  broadcast 0.0.0.0
+        ether 02:42:04:42:14:09  txqueuelen 0  (Ethernet)
+..............
+-o 指定桥设备名称
