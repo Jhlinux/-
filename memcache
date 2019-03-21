@@ -1,0 +1,133 @@
+构建memcached服务----本例基于redhat
+    memcached是高性能的分布式缓存服务器，用来集中缓存数据库查询结果，减少数据库的访问次数，以提高动态web应用的相应速度
+redhat7光盘自带,配好yum即可快速安装
+安装memcached
+[root@memcached ~]# yum -y install memcached
+[root@memcached ~]# which memcached
+/usr/bin/memcached
+memcached配置文件：查看即可，不需要修改
+[root@memcached ~]# cat /usr/lib/systemd/system/memcached.service 
+[root@memcached ~]# cat /etc/sysconfig/memcached 
+启动memcached服务
+[root@memcached ~]# systemctl start memcached
+[root@memcached ~]# systemctl status memcached
+查看memcached连接信息：
+[root@memcached ~]# netstat -tunlp | grep memcached
+tcp        0      0 0.0.0.0:11211  0.0.0.0:*  LISTEN      17796/memcached     
+tcp6       0      0 :::11211       :::*       LISTEN      17796/memcached     
+udp        0      0 0.0.0.0:11211  0.0.0.0:*     17796/memcached     
+udp6       0      0 :::11211       :::*          17796/memcached 
+关闭防火强和selinux设置
+使用telnet访问memcached
+[root@memcached ~]# yum -y install telnet
+[root@memcached ~]# telnet 192.168.4.50 11211 
+   #使用telnet连接memcached  telnet默认端口11211
+Trying 192.168.4.50...
+Connected to 192.168.4.50.
+set name 0 280 3 #0表示不压缩，280为数据缓存时间，3是需要存储的数据字节数
+lll
+STORED
+get name  #获取name的值
+VALUE name 0 3
+lll
+END
+set myname 0 180 10
+abcabcabca
+STORED
+get myname
+VALUE myname 0 10
+abcabcabca
+END
+replace myname 0 180 10 #替换 不存在则报错
+bvcbcbcbds
+STORED
+get myname
+VALUE myname 0 10
+bvcbcbcbds
+append myname 0 180 10 #向变量中追加数据
+kkkkkkkkkk
+STORED
+get myname
+VALUE myname 0 20
+bvcbcbcbdskkkkkkkkkk
+END
+delete myname #删除变量myname
+DELETED
+END
+get myname
+END
+stats #查看memcached状态信息
+STAT pid 17796
+STAT uptime 981
+STAT time 1551750807
+STAT version 1.4.15
+
+flush_all #清空所有数据
+quit #退出登陆
+###############################################################
+部署lnmp+memcached ----> 192.168.4.50
+memcached的部署同上
+部署lnmp 
+安装基础依赖包：
+[root@memcached ~]# yum -y install gcc openssl-devel pcre-devel zlib-devel
+[root@memcached ~]# tar -xvf nginx-1.12.2.tar.gz
+[root@memcached ~]# cd nginx-1.12.2/
+[root@memcached nginx-1.12.2]# ls
+auto        conf       html      man     src
+CHANGES     configure  LICENSE   objs
+CHANGES.ru  contrib    Makefile  README
+[root@memcached nginx-1.12.2]# ./configure --user=nginx --group=nginx --with-http_ssl_module 
+[root@memcached nginx-1.12.2]# make && make install
+安装mariadb数据库
+[root@memcached ~]# yum -y install mariadb mariadb-server mariadb-devel
+安装php
+[root@memcached ~]# ls
+php-fpm-5.4.16-42.el7.x86_64.rpm
+[root@memcached ~]# yum -y install php php-mysql
+[root@memcached ~]# yum -y install php-fpm-5.4.16-42.el7.x86_64.rpm 
+修改nginx配置文件
+[root@memcached ~]# vim /usr/local/nginx/conf/nginx.conf
+server {
+        listen       80;
+        server_name  localhost;
+       location / {
+            root   html;
+            index  index.php index.html index.htm;
+        }
+       location ~ \.php$ {
+            root           html;
+            fastcgi_pass   127.0.0.1:9000;
+            fastcgi_index  index.php;
+        #    fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
+            include        fastcgi.conf;
+        }
+}
+启动nginx
+[root@memcached ~]# /usr/local/nginx/sbin/nginx
+[root@memcached ~]# netstat -tunlp | grep :80
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      16744/nginx: master 
+udp        0      0 127.0.0.1:802           0.0.0.0:*                           1048/rpc.statd      
+启动mariadb
+[root@memcached ~]# systemctl start mariadb
+[root@memcached ~]# systemctl status mariadb
+启动php-fpm
+[root@memcached ~]# systemctl start php-fpm
+[root@memcached ~]# systemctl status php-fpm
+部署测试页面：
+[root@memcached ~]# vim /usr/local/nginx/html/test.php
+<?php
+$memcache=new Memcache;   //创建memcache对象
+$memcache->connect('192.168.4.50',11211) or die ('could not connect!!');
+$memcache->set('key','test');     //定义变量
+$get_values=$memcache->get('key');  //获取变量值
+echo $get_values;
+?>
+客户端测试（结果会失败）
+  firefox http://192.168.4.50/test.php
+这里因为没有给php安装扩展包，默认php是无法连接memcached数据库，需要给php安装扩展包
+[root@memcached ~]# yum -y install php-pecl-memcache
+[root@memcached ~]# systemctl  restart php-fpm
+客户端再次访问：结果会成功
+   firefox http://192.168.4.50/test.php
+#####################################################
+

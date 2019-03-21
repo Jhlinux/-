@@ -1,0 +1,176 @@
+PHP的本地Session共享
+                                    客户端192.168.4.50
+                                            |
+                                            |
+                                   nginx代理服务器
+                                   eth0:192.168.4.5
+                                   eth1:192.168.2.5
+                                            |
+                                            |
+                              ___ __________|_________________
+                              |                                |
+                              |                                |
+                          后端服务器web1              后端服务器web2
+                       eth1:192.168.2.100          eth1:192.168.2.200
+
+#######################################################################################
+
+PHP实现Session共享
+                              客户端192.168.4.50
+                                      |
+                                      |
+                              Nginx+memcached
+                              eth0:192.168.4.5
+                              eth1:192.168.2.5
+                                      |
+                                      |
+                       ________________________________
+                        |                      |
+                        |                      |
+                      web1                    web2
+                eth1:192.168.2.100       eth1:192.168.2.200
+
+部署nginx 和memcached
+[root@proxy ~]# yum  -y  install   gcc pcre-devel openssl-devel
+[root@proxy ~]# ls
+nginx-1.12.2.tar.gz
+[root@proxy ~]# tar -zxvf nginx-1.12.2.tar.gz
+[root@proxy ~]# cd nginx-1.12.2/
+[root@proxy nginx-1.12.2]# ls
+auto     CHANGES.ru  configure  html     man     src
+CHANGES  conf        contrib    LICENSE  README
+[root@proxy nginx-1.12.2]# ./configure --prefix=/usr/local/nginx --user=nginx --group=nginx --with-http_ssl_module
+[root@proxy nginx-1.12.2]# make && make install
+[root@proxy ~]# useradd nginx
+[root@proxy ~]# /usr/local/nginx/sbin/nginx #启动nginx
+[root@proxy ~]# ss -tunlp | grep :80
+tcp    LISTEN     0      128       *:80                    *:*                   users:(("nginx",pid=4557,fd=6),("nginx",pid=4556,fd=6))
+[root@proxy ~]# vim /etc/bashrc
+alias nginxstart='/usr/local/nginx/sbin/nginx'
+alias nginxstop='/usr/local/nginx/sbin/nginx -s stop'
+alias nginxreload='/usr/local/nginx/sbin/nginx s reload'
+[root@proxy ~]# exit
+登出
+Connection to 192.168.4.5 closed.
+[root@room9pc01 ~]# ssh -X root@192.168.4.5
+[root@proxy ~]# nginxstop #关闭nginx 
+[root@proxy ~]# nginxstart #启动nginx
+[root@proxy ~]# nginxreload #重启nginx
+[root@proxy ~]# nginxstop
+[root@proxy ~]# vim /usr/local/nginx/conf/nginx.conf
+upstream webs {
+     server 192.168.2.100:80;
+     server 192.168.2.200:80;
+}
+    server {
+        listen       80;
+        server_name  localhost;
+         charset utf-8;
+        #charset koi8-r;
+
+        #access_log  logs/host.access.log  main;
+
+        location / {
+            proxy_pass http://webs;#调用集群webs
+            root   html;
+            index  index.php index.html index.htm;
+        }
+      }
+关闭防火强和selinux
+[root@proxy ~]# systemctl stop firewalld
+[root@proxy ~]# vim /etc/sysconfig/selinux
+SELINUX=disabled
+[root@proxy ~]# reboot #使配置生效
+部署memcached
+[root@proxy ~]# yum -y install memcached
+[root@proxy ~]# which memcached
+/usr/bin/memcached
+和memcached相关的配置文件：不需要修改
+[root@proxy ~]# cat /usr/lib/systemd/system/memcached.service
+[root@proxy ~]# cat /etc/sysconfig/memcached 
+PORT="11211"
+USER="memcached"
+MAXCONN="1024"
+CACHESIZE="64"
+OPTIONS=""
+启动memcached服务
+[root@proxy ~]# systemctl start memcached.service 
+[root@proxy ~]# systemctl status memcached.service 
+[root@proxy ~]# netstat -tunlp | grep memcached
+
+部署后端服务器web1和web2
+web1和web2做相同的操作 以web1为例：
+web1配置如下：lnmp+session共享
+安装nginx:
+[root@web1 ~]# yum -y install gcc pcre-devel openssl-devel
+[root@web1 ~]# ls
+nginx-1.12.2.tar.gz
+[root@web1 ~]# tar -zxvf nginx-1.12.2.tar.gz
+[root@web1 ~]# cd nginx-1.12.2/
+[root@web1 nginx-1.12.2]# ls
+auto     CHANGES.ru  configure  html     man     src
+CHANGES  conf        contrib    LICENSE  README
+[root@web1 nginx-1.12.2]# ./configure --prefix=/usr/local/nginx --user=nginx --group=nginx --with-http_ssl_module
+[root@web1 nginx-1.12.2]# make && make install
+[root@web1 ~]# useradd nginx
+[root@web1 ~]# /usr/local/nginx/sbin/nginx 
+[root@web1 ~]# netstat -tunlp | grep nginx
+tcp        0      0 0.0.0.0:80              0.0.0.0:*               LISTEN      5391/nginx: master  
+安装mariadb:
+[root@web1 ~]# yum -y install mariadb mariadb-server mariadb-devel 
+[root@web1 ~]# systemctl start mariadb
+[root@web1 ~]# systemctl status mariadb
+[root@web1 ~]# systemctl enable mariadb
+安装php:
+[root@web1 ~]# ls
+php-fpm-5.4.16-42.el7.x86_64.rpm
+[root@web1 ~]# yum -y install php php-mysql
+[root@web1 ~]# yum -y install php-fpm-5.4.16-42.el7.x86_64.rpm
+[root@web1 ~]# sed -i '65,71s/#//' /usr/local/nginx/conf/nginx.conf
+[root@web1 ~]# vim /usr/local/nginx/conf/nginx.conf
+        location / {
+            root   html;
+            index  index.php index.html index.htm;
+        }
+        location ~ \.php$ {
+            root           html;
+            fastcgi_pass   127.0.0.1:9000;
+            fastcgi_index  index.php;
+           # fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
+            include        fastcgi.conf;
+        }
+[root@web1 ~]# /usr/local/nginx/sbin/nginx -s reload
+由于测试页面是php代码 要添加memcached扩展，才能连接memcached数据库
+[root@web1 ~]# yum -y install php-pecl-memcache
+[root@web1 ~]# vim /etc/php-fpm.d/www.conf 
+224 php_value[session.save_handler] = memcache
+225 php_value[session.save_path] = "tcp://192.168.2.5:11211"
+定义Session信息存储在公共的memcached服务器上 主机参数是memcache 
+通过path参数定义公共的memcached服务器在哪即服务器的ip和端口
+[root@web1 ~]# systemctl start php-fpm.service
+[root@web1 ~]# systemctl  enable php-fpm.service 
+创建测试页面：
+[root@web1 ~]# ls
+php-memcached-demo.tar.gz 
+[root@web1 ~]# tar -xvf php-memcached-demo.tar.gz
+[root@web1 ~]# cd php-memcached-demo/
+[root@web1 php-memcached-demo]# ls
+home.php  images  index.php  login.php  README.md  style.css
+[root@web1 php-memcached-demo]# cp -a * /usr/local/nginx/html/
+[root@web1 php-memcached-demo]# cd /usr/local/nginx/html/
+[root@web1 html]# ls
+50x.html  images      index.php  README.md
+home.php  index.html  login.php  style.css
+给index.php 和home.php设置背景颜色pink
+[root@web1 html]# firefox http://192.168.2.100 #填写账户信息
+[root@web1 html]# cd /var/lib/php/session/ #查看服务器本地的session信息
+您在 /var/spool/mail/root 中有邮件
+[root@web1 session]# ls
+sess_7tjf0mjcah2bfjqrk240bnec01
+[root@web1 session]# cat sess_7tjf0mjcah2bfjqrk240bnec01
+login_user|s:0:"";logged_in|s:4:"true";id|s:26:"7tjf0mjcah2bfjqrk240bnec01";
+
+web2做相同的部署（省略）
+客户端访问：
+     http://192.168.4.5(尽量使用chrome浏览器)
+

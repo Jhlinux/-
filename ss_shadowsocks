@@ -1,0 +1,42 @@
+使用ss和shadowsocks软件连接谷歌
+服务端：
+   安装pip 
+       sudo apt install python3-pip
+   安装shadowsocks软件
+       pip3 install https://github.com/shadowsocks/shadowsocks/archive/master.zip
+   安装完后检查是否为3.0.0版本
+      ssserver --version
+   若显示Shadowsocks 3.0.0则进行下一步
+   配置shadowsocks:
+      配置命令：nohup ssserver -k "password" &> /dev/null &
+      默认配置文件：/etc/shadowsocks/config.json
+      查看下：cat /etc/shadowsocks/config.json 
+      起服务：  ssserver -c /etc/shadowsocks/config.json
+
+客户端：
+    安装shadowsocks软件(同上)        
+    配置命令：sslocal -s ip -k password &> /dev/null &
+    修改配置文件：/etc/shadowsocks/config.json
+    设置本地代理：网络设置-> 代理socks5  port:1080   ip:127.0.0.1
+    起服务：sslocal -c /etc/shadowsocks/config.json
+ #####################################################################
+设置开机自起服务：使用systemctl 
+    创建shadowsocks.service文件
+        vim /lib/systemd/system/shadowsocks.service
+          [Unit]
+          Description=Shadowsocks Server
+          After=network.target
+
+         [Service]
+         ExecStart=/usr/local/bin/ssserver -c /etc/shadowsocks/config.json
+         Restart=on-abort
+
+         [Install]
+         WantedBy=multi-user.target
+         :wq
+     运行shadowsocks.service
+           systemctl restart shadowsocks.service
+     设置开机自起：
+           systemctl enable shadowsocks.service
+     查看运行状态：
+           systemctl status shadowsocks.service

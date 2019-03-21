@@ -1,0 +1,16 @@
+部署Jenkins 基于CentOS7
+关闭防火墙和SELinux(省略)
+[root@centos-100 ~]# wget -O /etc/yum.repos.d/jenkins.repo https://pkg.jenkins.io/redhat-stable/jenkins.repo
+[root@centos-100 ~]# rpm --import https://pkg.jenkins.io/redhat-stable/jenkins.io.key
+Jenkins依赖java
+[root@centos-100 ~]# yum -y install java
+[root@centos-100 ~]# java -version
+安装Jenkins
+[root@centos-100 ~]# yum -y install jenkins
+启动Jenkins #启动之前要确保8080端口没被占用
+systemctl start jenkins或service jenkins start
+访问Jenkins
+浏览器输入：http://192.168.1.100:8080 #jenkins默认使用8080端口
+解锁Jenkins:
+[root@centos-100 ~]# cat /var/lib/jenkins/secrets/initialAdminPassword
+ 72ec82602f7b4c469f36378a264d7cb1

@@ -1,0 +1,16 @@
+gitlab的部署：
+关闭防火墙和SELinux(省略)
+一键部署gitlab命令如下：
+[root@centos-100 ~]# curl -fsSL https://raw.githubusercontent.com/aqzt/kjyw/master/git/gitlab_install.sh | sed 's/\r//g' | sh
+初始化gitlab
+[root@centos-100 ~]# gitlab-ctl reconfigure
+[root@centos-100 ~]# gitlab-ctl start  #启动gitlab
+[root@centos-100 ~]# gitlab-ctl status #查看gitlab状态
+[root@centos-100 ~]# gitlab-ctl stop  #停止gitlab
+[root@centos-100 ~]# gitlab-ctl tail  #查看日志
+[root@centos-100 ~]# gitlab-runner start  
+[root@centos-100 ~]# gitlab-runner status
+[root@centos-100 ~]# gitlab-runner status
+浏览器测试：http://192.168.1.100
+修改密码
+初次登陆用户名：root
