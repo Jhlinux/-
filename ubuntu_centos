@@ -22,6 +22,26 @@ yum源位置：/etc/yum.repos.d/centos.repo
 卸载组：yum -y groupremove
 yum provides */ifconfig 查看命令的包
 ########################################################################
+CentOS6的服务管理
+系统服务脚本: /etc/init.d/*
+基本方法: 1)service  服务名   start/stop/restart/status/reload
+          2)/etc/init.d/服务名 start/stop/restart/status/reload
+设置服务自启状态:
+   chkconfig --list +服务名 #列出服务的自启状态
+   chkconfig 服务名 on/off #开机自起或开机不自起
+CentOS7的服务管理
+配置目录:/etc/systemd/system/
+服务目录:/lib/systemd/system/*.service
+启动服务或关闭服务或查看服务的状态:
+     systemctl start/stop/restart/status +服务名
+开机自起或开机不自起:
+     systemctl enable/disable  + 服务名
+##########################################################################################################################
+centos6下破解root密码:
+   reboot --> 按e --> 选择内核再按e -->选择以kernel开头的行再按e --> 在quiet后面输入数字1回车--> 按b --> 输入passwd root设密码--> reboot即可
+centos7下破解root密码:
+   reboot的同时按e(一直按) --> 在linux16的行尾输入rd.break console=tty0 --> 按ctrl+x进入救援模式--> 输入mount -o remount,rw /sysroot 回车 --> 输入chroot /sysroot 回车--> 输入passwd 回车设密码-->输入touch /.autorebool回车-->exit-->reboot
+###########################################################################
 linux系统下制作U盘启动盘
 fdisk -l 查看U盘对应的设备名称
 umount /dev/sdb 卸载U盘
