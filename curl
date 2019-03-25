@@ -1,0 +1,79 @@
+http的请求方法：
+常用方法 GET，POST，HEAD
+其他方法 OPTIONS，PUT，DELETE，TRACE和CONNECT
+ES常用：
+PUT --增
+DELETE --删
+POST --改
+GET --查
+系统命令curl：
+    是一个利用URL规则在命令行下工作的文件传输工具,可以说是一款很强大的http命令行工具。它支持多种请求模式,自定义请求头等强大功能,是一款综合工具
+curl 常用参数介绍：
+    -A 修改请求 agent
+    -X 设置请求方法
+    -i 显示返回头信息
+[root@190web1 ~]# curl -i http://www.163.com #查看该网站web服务器的类型
+Server: nginx
+抓取页面内容到一个文件中
+curl -o home.html http://www.sina.com.cn/index.html
+代理：
+curl -x 192.168.1.100:80 -o home.html http://www.sina.com.cn
+[root@190web1 ~]# curl -XPOST http://118.144.89.240/info.php 
+                      #以POST方法访问该网站
+<pre>
+[ REQUEST_METHOD] ==> POST
+[    REMOTE_ADDR] ==> 123.138.79.11
+[HTTP_USER_AGENT] ==> curl/7.29.0
+[   HTTP_REFERER] ==> 
+
+--- --- POST options is --- ---
+Array
+(
+)
+[root@190web1 ~]# curl -XGET http://118.144.89.240/info.php 
+                       #以GET方法访问该站点
+<pre>
+[ REQUEST_METHOD] ==> GET
+[    REMOTE_ADDR] ==> 123.138.79.11
+[HTTP_USER_AGENT] ==> curl/7.29.0
+[   HTTP_REFERER] ==> 
+
+--- --- GET options is --- ---
+Array
+(
+)
+##############################################################################
+elk插件的安装 : 将插件放在本地/root/目录下
+[root@194db1 ~]# ls
+elasticsearch-head-master.zip
+bigdesk-master.zip  elasticsearch-kopf-master.zip
+
+[root@194db1 bin]# pwd
+/usr/share/elasticsearch/bin
+[root@194db1 bin]# ./plugin install file:///root/bigdesk-master.zip
+[root@194db1 bin]# ./plugin list #查看已安装的插件
+Installed plugins in /usr/share/elasticsearch/plugins:
+    - head
+    - kopf
+    - bigdesk
+浏览器访问： http://192.168.1.194/_plugin/插件名
+#########################################################################
+创建索引：
+curl -XPUT http://192.168.1.194:9200/tedu -d '
+   {"settings":{
+         "index":{
+             "number_of_shards":3,
+             "number_of_replicas":1
+          }
+   }
+}'
+##############################################################
+增：
+[root@194db1 ~]# curl -XPUT http://192.168.1.194:9200/group/student/1 -d '{"姓名":"李欣欣","爱好":"找妹子","特长":"吹牛"}'
+改：
+[root@194db1 ~]# curl -XPOST http://192.168.1.194:9200/group/student/2/_update -d '{"doc": {"爱好":"写论文"}}'
+查：
+[root@194db1 ~]# curl -XGET http://192.168.1.194:9200/group/student/2
+删：
+[root@194db1 ~]# curl -XDELETE http://192.168.1.194:9200/group/student/2
+
