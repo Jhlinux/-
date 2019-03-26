@@ -28,9 +28,9 @@ Web通信基本概念
 1.安装软件httpd
 [root@server0 ~]# yum -y install httpd
 2.书写一页面文件
-]# echo '<h1>NSD1811 Web1' > /var/www/html/index.html
+]# echo '<h1>this is  Web1' > /var/www/html/index.html
 ]# cat /var/www/html/index.html
-<h1>NSD1811 Web1
+<h1>this is  Web1
 3.重起httpd服务
 [root@server0 ~]# systemctl restart httpd
 [root@server0 ~]# systemctl enable httpd

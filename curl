@@ -1,4 +1,5 @@
-http的请求方法：
+
+khttp的请求方法：
 常用方法 GET，POST，HEAD
 其他方法 OPTIONS，PUT，DELETE，TRACE和CONNECT
 ES常用：
@@ -56,7 +57,7 @@ Installed plugins in /usr/share/elasticsearch/plugins:
     - head
     - kopf
     - bigdesk
-浏览器访问： http://192.168.1.194/_plugin/插件名
+浏览器访问： http://192.168.1.194:9200/_plugin/插件名
 #########################################################################
 创建索引：
 curl -XPUT http://192.168.1.194:9200/tedu -d '
@@ -76,4 +77,5 @@ curl -XPUT http://192.168.1.194:9200/tedu -d '
 [root@194db1 ~]# curl -XGET http://192.168.1.194:9200/group/student/2
 删：
 [root@194db1 ~]# curl -XDELETE http://192.168.1.194:9200/group/student/2
-
+配置logstash的网址 
+https://www.elastic.co/guide/en/logstash/current/index.html
