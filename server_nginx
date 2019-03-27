@@ -1,3 +1,11 @@
+使用yum安装的nginx配置文件及项目文件位置：
+yum -y install nginx 
+配置文件：/etc/nginx/nginx.conf
+自定义的配置文件：/etc/nginx/conf.d/
+项目文件：/usr/share/nginx/html/
+日志文件：/var/log/nginx
+安装位置：/usr/sbin/nginx
+#################################################################
 部署lnmp环境:
 安装依赖:
 [root@centos ~]# yum -y install gcc openssl-devel pcre-devel
