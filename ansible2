@@ -1,0 +1,32 @@
+ansible的七个命令
+1)ansible 命令
+       -m 模块
+       -i PATH,--inventory=PATH 指定库存主机文件的路径，默认是/etc/ansible/hosts
+       -a 命令 （a-->arguments） 
+2)ansible-doc -l 列出所有已安装的模块
+  ansible-doc -s + 模块名  #查看某个模块的用法
+3)ansible-galaxy 用于从https://galaxy.ansible.com/站点下载第三方扩展模块
+    eg：ansible-galaxy install aeriscloud.docker
+4)ansible-link 用于检查playbook语法是否正确
+    eg：ansible-link playbook.yml
+5)ansible-playbook 该指令通过读取playbook文件后，执行相应的动作
+6)ansible-pull 
+      使用以下场景：
+          你有数量巨大的机器需要配置，即使使用非常高的线程还是要花费很多时间
+          你要在一个没有网络连接的机器上运行ansible
+ansible-vault
+重点是ansible和ansible-playbook
+#####################################################################################################
+ansible常用模块
+1）ping
+     ansible web  -m ping
+2) setup
+     setup模块主要用于获取主机信息，在playbooks里经常使用的一个参数gather_facts就与该模块相关
+     setup模块下经常使用的一个参数是filter参数，用法如下：
+    查看主机内存：   
+     ansible  web -m setup -a 'filter=ansible_*_mb'
+    查看网卡信息：
+      ansible web -m setup -a 'filter=ansible_eth0'
+    将所有的主机信息输入到/tmp/facts目录下,每台主机的信息输入到主机名文件中(/etc/ansible/hosts)
+      ansible all -m setup --tree /tmp/facts
+

@@ -1,0 +1,196 @@
+ansible配置文件查找顺序
+     首先检测ANSIBLE_CONFIG变量定义的配置文件(环境变量)
+     其次检查当前目录下的./ansible.cfg文件
+     再次检查当前用户家目录下的～/ansible.cfg文件
+     最后检查/etc/ansible/ansible.cfg文件
+   /etc/ansible/ansible.cfg是ansible的默认配置文件路径
+ansible的安装
+方法一：使用自定义yum仓库安装
+方法二：使用git源码编译安装
+下载ansible源码：
+    git clone git://github.com/ansible/ansible.git
+    yum -y install python-setuptools python-devel
+    python setup.py build
+    python setup.py install
+方法三：使用pip安装
+    yum -y install epel-release python-pip
+    pip install --upgrade pip
+    pip install ansible
+方法四：使用yum扩展源安装（推荐）
+   安装epel源
+      yum install http://mirrors.163.com/centos/7.4.1708/extras/x86_64/Packages/epel-release-7-9.noarch.rpm 
+   安装ansible
+      yum -y install ansible
+查看版本： ansible --version
+#########################################################
+ansible成员介绍：
+[root@100ansible ~]# tree /etc/ansible/
+/etc/ansible/
+├── ansible.cfg  #ansible的配置文件
+├── hosts  #ansible的主仓库 用来存储需要管理的远程主机的相关信息
+└── roles
+ansible配置文件详解：
+    ansible_ssh_host  设置连接的远程主机的主机名
+    ansible_ssh_port  设置连接的远程主机的ssh端口
+    ansible_ssh_user  设置连接的远程主机的用户
+    ansible_ssh_pass  ssh密码（建议使用ssh密钥）
+    ansible_sudo_pass sudo密码（建议使用--ask-sudo-pass）
+    ansible_sudo_exe  sudo命令路径（适用于1.8及以上的版本）    
+    ansible_connection  与主机的连接类型，如local,ssh或paramiko
+      1.2以前默认使用paramiko,1.2以后默认使用'smart',它会根据是否支持ConnectrolIPersist来判断ssh 方式是否可行
+    ansible_ssh_private_key_file   ssh时用的私钥文件，适用于有多个密钥，而你不想使用ssh代理的情况
+   ansible_shell_type   目标系统的shell类型，默认情况下，命令执行使用sh语法，可设置为csh或fish
+   ansible_python_interpreter   目标主机的python路径，适用情况：系统有多个python，或者命令路径不是/usr/bin/python
+#########################################################################
+修改ansible的配置文件
+[root@100ansible ~]# vim /etc/ansible/ansible.cfg 
+14 inventory   = /etc/ansible/hosts 定义托管主机分组信息文件
+61 host_key_checking = False  #远程连接时，自动将y输入
+[root@100ansible ~]# cd /etc/ansible/
+[root@100ansible ansible]# ls
+ansible.cfg  hosts  roles
+[root@100ansible ansible]# vim hosts #定义主机分组
+[web]
+190web1
+105web2
+[web:vars]
+ansible_ssh_port=22222 #定义web组的所有主机ssh都用22222端口
+[db]
+194db1 ansible_ssh_port=22222 #设置单台主机ssh的端口
+184db2
+[other]
+cache
+查看ansible主机分组：
+[root@100ansible ~]# ansible web --list-hosts
+  hosts (2):
+    190web1
+    105web2
+[root@100ansible ~]# ansible db --list-hosts
+  hosts (2):
+    194db1
+    184db2
+查看所有主机：
+[root@100ansible ~]# ansible all --list-hosts
+  hosts (5):
+    190web1
+    105web2
+    cache
+    194db1
+    184db2
+[root@100ansible ~]# vim /etc/ansible/hosts
+[web]
+190web1
+105web2
+[db]
+194db1
+184db2
+[other]
+cache
+[app:children]
+web
+db
+[root@100ansible ~]# ansible app --list-hosts
+  hosts (4):
+    190web1
+    105web2
+    194db1
+    184db2
+[root@100ansible ~]# ansible cache,db -m ping -k
+SSH password: 
+194db1 | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+184db2 | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+cache | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+####################################################################
+自定义ansible配置文件
+[root@100ansible ~]# mkdir myansible
+[root@100ansible ~]# cd myansible/
+[root@100ansible myansible]# vim ansible.cfg
+[defaults]
+inventory    = myhosts  #定义远程主机地址配置文件
+host_key_checking=False 
+[root@100ansible myansible]# vim myhosts 
+[app1]
+190web1
+105web2
+[app2]
+194db1
+184db2
+[app:children]
+app1
+app2
+[root@100ansible myansible]# ansible app -m ping -k
+SSH password: ssh的连接密码
+190web1 | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+184db2 | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+105web2 | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+194db1 | SUCCESS => {
+    "changed": false, 
+    "ping": "pong"
+}
+ansible命令基础：
+查看所有远程主机的yum配置文件
+[root@100ansible ~]# ansible all -m command -a 'ls /etc/yum.repos.d/' -k 
+批量给远程主机部署密钥
+[root@100ansible ~]# ansible all -m authorized_key -a "user=root exclusive=true manage_dir=true key='$(< /root/.ssh/id_rsa.pub)'" -k
+例子：在190web1，184db2上添加用户nb,设置密码123,要求nb第一次登陆系统 修改密码
+[root@100ansible ~]# ansible 190web1,184db2 -m shell -a 'useradd nb && echo 123 | passwd --stdin nb'
+[root@100ansible ~]# ansible 190web1,184db2 -m command -a 'chage -d 0 nb'
+例子：在所有主机上创建用户wk,要求wk和nb用户不能同时出现在同一台主机上，设置wk密码是456，要求wk第一次登陆系统修改密码
+[root@100ansible ~]# vim user.sh
+#!/bin/bash
+id nb > /dev/null
+if [ $? != 0 ];then
+    useradd wk
+    echo 456 | passwd --stdin wk > /dev/null
+    chage -d 0 wk
+fi
+[root@100ansible ~]# ansible  all -m script -a 'user.sh'
+[root@100ansible ~]# ansible all -m copy -a 'src=/etc/resolv.conf dest=/etc/resolv.conf'
+lineinfile模块：
+   path    要修改的文件
+   regexp  要修改的行
+   line    修改后的样子
+ansible cache -m lineinfile -a ' \
+      path=/etc/sysconfig/network-scripts/ifcfg-eth0 \
+      regexp='^WA' \
+      line=\"WATEWAY=\"192.168.1.1\""'
+replace模块：
+     path     要修改的文件
+     regexp   要修改的位置
+     replace  修改后的样子
+ansible 190web1 -m replace -a
+      'path=/etc/sysconfig/network-scripts/ifcfg-eth0 \
+       exgexp="1\.1" \
+       replace="1.254"'
+yum 模块：
+   name   包名，多个包用，分隔
+   state   动作installed   removed   
+service 模块
+   name   服务名
+   state  动作 started stopped restarted
+   enabled  yes开机自起   no开机不起
+给db主机安装mariadb httpd
+[root@100ansible ~]# ansible db -m yum -a 'name=mariadb-server,mariadb,mariadb-devel,httpd state=installed'
+起服务并设置开机自起
+[root@100ansible ~]# ansible db -m service -a 'name=httpd,mariadb state=started enabled=yes'
+查看服务及端口
+[root@100ansible ~]# ansible db -m shell -a 'ss -tunlp | grep :80'
+[root@100ansible ~]# ansible db -m shell -a 'ss -tunlp | grep :3306'

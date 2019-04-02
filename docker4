@@ -1,0 +1,201 @@
+docker web-ui
+部署dockerUI:不支持多主机的管理
+下载镜像：
+[root@centos-190 ~]# docker pull uifd/ui-for-docker
+启动容器：
+[root@centos-190 ~]# docker run -it -d --name docker-web -p 9000:9000 -v /var/run/docker.sock:/var/run/docker.sock docker.io/uifd/ui-for-docker
+访问测试：http://192.168.1.190:9000
+###############################################################
+Portainer可视化界面：
+      Protainer是docker的图形化管理工具，提供状态显示面板，应用模板快速部署，容器镜像网络数据卷的基本操作（包括上传下载镜像，创建容器等），事件日志显示，容器控制台操作，Swarm集群和服务等集中管理，功能十分全面，基本能满足中小型单位对容器的全部需求
+安装部署：
+下载镜像：
+[root@centos-190 ~]# docker pull portainer/portainer
+运行Portainer   单机版
+[root@centos-190 ~]# docker run -d -p 8000:9000 --restart=always -v /var/run/docker.sock:/var/run/docker.sock --name prtainer-alone portainer/portainer
+运行Portainer   集群版
+[root@centos-190 ~]# docker run -d -p 9000:9000 --restart=always --name prtainer-cluster portainer/portainer
+访问测试：http://192.168.1.190:8000
+#############################################################################
+Docker Compose项目实战
+Compose定位是“defining and running complex applications with Docker”,前身是Fig,兼容Fig的模板文件
+Dockerfile可以让用户管理一个单独的应用容器；
+Compose允许用户在一个模板(YAML格式)中定义一组相关联的应用容器，被称为一个项目，该项目由python编写，实际上调用了Docker提供的API来实现
+安装---centos7
+先安装python-pip   使用pip安装docker-compose
+[root@centos-190 ~]# yum -y install epel-release python-pip
+[root@centos-190 ~]# pip install --upgrade pip 
+[root@centos-190 ~]# pip -V 检查pip版本
+安装Docker-compose
+[root@centos-190 ~]# pip install docker-compose
+[root@centos-190 ~]# docker-compose -version #检查版本
+服务：一个应用容器，实际上可以运行多个相同镜像的实例
+项目：由一组关联的应用容器组成的一个完整业务单元
+一个项目可以由多个服务或容器组成，compose面向项目进行管理
+YAML模板文件详解：
+    默认的模板文件是docker-compose.yml,其中定义的每个服务都必须通过image指令指定镜像或build指令来自动构建(需要dockerfile)
+    如果使用build指令，在Dockerfile中设置的选项将会自动被获取，无需在docker-compose.yml中再次设置
+一 YAML语法格式：
+ YAML中允许表示三种格式：分别是常量值，对象和数组
+  例如：
+   表示url的值
+       url:http://www.baidu.com
+   表示server.host属性的值
+       server:
+           host: http://www.baidu.com
+   数组，表示server为[a,b,c]  
+        server:
+            -120.168.117.21
+            -120.168.117.22
+            -120.168.117.23
+    常量的表示
+        pi:3.14  #定义一个数值3.14
+        hasChild:true   #定义一个布尔值
+        name："你好YAML" #定义一个字符串
+基本格式要求：
+    YAML大小写敏感
+    使用缩进代表层级关系
+    缩进只能使用空格，不能使用TAB，不要求空格个数，只需要相同层级左对齐即可
+    使用#作为注释，YAML中只有行注释
+对象：
+   使用冒号代表，格式为key: value 冒号后面要加一个空格
+   可以使用缩进表示层级关系：
+      key:
+         child-key: value
+         child-key2: value2
+   YAML中还支持流式语法表示对象：
+      key: {child-key: value,child-key2: value2}
+数组：
+   使用一个端横杠加一个空格代表一个数组项：
+      hobby:
+         - linux
+         - seeTV
+   companies:
+        - 
+          id: 1
+          name: company1
+          price: 220w
+        -
+          id: 2
+          name: company2
+          price: 400w
+    companies是一个数组，每个数组元素又由id,name,price三个属性构成
+常量：
+    YAML中提供了多种常量结构，包括：整数，浮点数，字符串，NULL，日期，布尔，时间，例子如下：
+     boolean:
+         - true
+         - false
+     float:
+        - 3.14
+        - 5.555
+     int:
+        - 123       
+        - 0b1010_0111_0100_1010_1110 #二进制数
+     null:
+        nodeName: 'node'
+        parent: ~ #使用～表示null
+     string:
+         - 哈哈
+         - 'hello world'
+      date:
+        - 2018-02-18 #日期格式必须是yyyy-mm-dd
+      datetime:
+         - 2018-02-18T15:02:20+08:00
+         时间和日期之间使用T连接，最后使用+代表时区
+一些特殊符号：
+1) YAML可以在同一个文件中，使用---表示一个文档的开始，比如在Springboot中profile的定义：
+    server:
+        address: 192.168.1.100
+    ---
+    spring:
+       profiles: development
+       server:
+          address: 127.0.0.1
+    ---
+    spring:
+       profiles: production
+       server:
+           address: 192.168.1.120
+     代表定义了两个profile,一个是development,一个是production，也常常使用---来分割不同的内容，如记录日志：
+     ---
+     time: 2018-02-14T15:02:20+08:00
+     user: ed 
+     warning:
+          this is an error message for the log file
+     ---
+     time: 2018-02-15T15:20:20+08:00
+     user: ed
+     warning:
+         a slightly different error message
+2) ...和---配合使用，在一个配置文件中代表一个文件的结束
+     ---
+     time: 20:03:20
+     player: Sammy Sosa
+     action: strike (miss)
+     ...
+     ---
+     time: 20:03:47
+     player: Sammy Sosa
+     action: grand slam
+     ...
+   相当于在一个yaml文件中连续写了两个yaml配置项
+3）!! 类型强制转换
+     string:
+        - !!str 54376
+        - !!str true
+    把数字和布尔类型转化为字符串
+二： YAML模板配置详解
+ image --指定镜像名称或镜像ID，若镜像在本地不存在，compose将会尝试拉取这个镜像
+    例子：image: ubuntu
+          image: centos
+ build --指定Dockerfile所在文件夹的路径，compose将会使用它自动构建这个镜像，然后使用这个镜像
+    例子：build : .
+          build: /path/to/build/dir
+ links --连接到其他服务中中的容器,连接容器后，将会在防火墙中创建对应的路由规则，同时会自动在容器中/etc/hosts文件中创建对应的主机名和ip地址记录
+    例子：links:
+             - db:database
+             - redis
+ external_links --连接到docker-compose.yml外部的容器，甚至并非compose管理的容器
+    例子：external_links:
+               - redis_1
+               - project_db1:mysql1
+               - project_db1:postgreq1
+ ports --暴露端口信息
+      使用宿主：容器  （HOST:CONTAINER）  格式或者仅仅指定容器的端口（宿主将会随机选择端口）都可以
+ ports:
+    - "3000"
+    - "8000:8000"
+    - "49100:22"
+    - "127.0.0.1:8001:8001"
+
+ expose --暴露端口，但不映射到宿主机，只被连接到服务访问
+      expose:
+         - "8000"
+         - "3000"
+ volumes  卷挂载路径设置。可以设置宿主机路径 （ HOST:CONTAINER  ） 或加上访问模式（ HOST:CONTAINER:ro  ）
+ volumes:
+    - /var/lib/mysql
+    - cache/:/tmp/cache
+    - ~/configs:/etc/configs/:ro
+ volumes_from --从另一个服务或容器挂载它的所有卷
+    volumes_from:
+       - service_name
+       - container_name
+ environment --设置环境变量。你可以使用数组或字典两种格式。
+    environment:
+        RACK_ENV: development
+        SESSION_SECRET:
+    environment:
+         - RACK_ENV=development
+         - SESSION_SECRET
+    env_file
+
+从文件中获取环境变量，可以为单独的文件路径或列表,
+如果通过  docker-compose -f FILE  指定了模板文件，则  env_file  中路径会基于模板文件路径。如果有变量名称与  environment  指令冲突，则以后者为准
+     env_file: .env
+     env_file:
+         - ./common.env
+         - ./apps/web.env
+         - /opt/secrets.env
+
+

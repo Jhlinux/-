@@ -1,0 +1,22 @@
+使用yaml创建用户
+[root@100ansible ~]# vim user.yml 
+--- 
+- hosts: db 
+  remote_user: root
+  vars: 
+     username: dd
+  tasks:
+     - name: add user "{{username}}"
+       user:
+         name: "{{username}}"
+         group: mysql
+     - name: change "{{username}}" password
+       shell: echo 123456 | passwd --stdin "{{username}}"
+     - shell: chage -d 0 "{{username}}"
+[root@100ansible ~]# cat args.yml 
+"username":
+   "wk"
+创建用户nb
+[root@100ansible ~]# ansible-playbook user.yml -e "{'username':'nb'}"
+创建用户wk
+[root@100ansible ~]# ansible-playbook user.yml -e @args.yml
