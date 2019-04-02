@@ -10,7 +10,7 @@ gitlab的部署：
 [root@centos-100 ~]# gitlab-ctl tail  #查看日志
 [root@centos-100 ~]# gitlab-runner start  
 [root@centos-100 ~]# gitlab-runner status
-[root@centos-100 ~]# gitlab-runner status
+[root@centos-100 ~]# gitlab-runner stop
 浏览器测试：http://192.168.1.100
 修改密码
 初次登陆用户名：root

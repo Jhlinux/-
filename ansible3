@@ -20,3 +20,35 @@
 [root@100ansible ~]# ansible-playbook user.yml -e "{'username':'nb'}"
 创建用户wk
 [root@100ansible ~]# ansible-playbook user.yml -e @args.yml
+#####################################################################
+使用ansible-play 安装nginx #要提前将nginx源码包做成rpm包并配置为yum源
+[root@ecs-jump2 jhh]# ls
+ansible.cfg    ansible.yml  nginx.conf
+ansible.retry  myhosts      php.yml
+[root@ecs-jump2 jhh]# cat ansible.yml
+---
+- hosts: web
+  remote_user: root
+  tasks:
+    - name: install a nginx
+      yum:
+        name: nginx
+        state: installed
+    - copy:
+        src: nginx.conf
+        dest: /etc/nginx/nginx.conf
+    - service:
+        name: nginx
+        enabled: yes
+        state: restarted
+[root@ecs-jump2 jhh]# cat ansible.cfg 
+[defaults]
+inventory          = myhosts
+host_key_checking = False
+[root@ecs-jump2 jhh]# cat myhosts 
+[web]
+ecs-web1
+ecs-web2
+给web组的主机安装nginx
+[root@ecs-jump2 jhh]# ansible-play ansible.yml
+
