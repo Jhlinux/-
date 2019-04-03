@@ -1,0 +1,1037 @@
+搭建mysql服务
+[root@mysql50 jhh]# ls
+mysql-5.7.17.tar
+[root@mysql50 jhh]# tar -xvf mysql-5.7.17.tar 
+./mysql-community-client-5.7.17-1.el7.x86_64.rpm
+./mysql-community-common-5.7.17-1.el7.x86_64.rpm
+./mysql-community-devel-5.7.17-1.el7.x86_64.rpm
+./mysql-community-embedded-5.7.17-1.el7.x86_64.rpm
+./mysql-community-embedded-compat-5.7.17-1.el7.x86_64.rpm
+./mysql-community-embedded-devel-5.7.17-1.el7.x86_64.rpm
+./mysql-community-libs-5.7.17-1.el7.x86_64.rpm
+./mysql-community-libs-compat-5.7.17-1.el7.x86_64.rpm
+./mysql-community-minimal-debuginfo-5.7.17-1.el7.x86_64.rpm
+./mysql-community-server-5.7.17-1.el7.x86_64.rpm
+./mysql-community-test-5.7.17-1.el7.x86_64.rpm
+[root@mysql50 jhh]# yum -y install *.rpm
+[root@mysql50 jhh]# systemctl restart mysqld
+[root@mysql50 jhh]# systemctl enable mysqld
+
+############################################################
+查看mysql初始密码：grep -i password /var/log/mysqld.log
+登陆mysql数据库：mysql -uroot -p'初始密码'
+mysql配置文件:/etc/my.cnf
+mysql数据库目录：/var/lib/mysql
+查看mysql的密码策略：
+     mysql> show variables like "%password%";
+修改mysql的密码策略：
+     vim  /etc/my.cnf
+         [mysqld]
+          validate_password_policy=0
+          validate_password_length=6
+     :wq
+重启mysqld服务
+      systemctl restart mysqld
+修改mysql的密码：
+    mysql> alter user root@"localhost" identified by '123456';
+#################################################################################################################
+mysql数据库的基本操作
+   查看mysql的安装包：rpm -qa | grep mysql
+   连接mysql:mysql -h localhost -u用户名 -p密码 
+   查看有哪些数据库：show  databases;
+   使用数据库：use  数据库名;
+   创建数据库：create database 库名;
+   查看当前所在的数据库：select database();
+   删除数据库：drop database 库名;
+   查看数据表：show  tables;
+   创建数据表：create table 库名.表名(name char(10),age int,sex char(10)) default utf8;
+   eg:create table db1.学生表(姓名 char(10),住址 char(10))default charset=utf8;
+   插入数据：insert into db1.学生表("张三丰","武当山");
+   改数据：update db1.学生表 set 住址="南京" where name="张三丰";
+   删除数据：delete from db1.学生表 where name="张三丰";
+   查看数据：select * from db1.学生表;
+   查询表结构 ： desc  表名;
+   删除数据表： drop table  表名;
+#####################################################################################################
+mysql的数据类型：
+    数值型：
+       整型int  小整型tinyint  浮点型float(n,m) n是总位数  m是小数位数
+      eg：mysql> create table db1.t2( age tinyint );
+          mysql> create table db1.t4( pay float(5,2) );
+         支付数据  总位数为5，小数2位，范围在 -999.99 --- 999.99
+    字符型：
+      定长char : 最大长度为255个字符
+      变长varchar ：按实际大小分配存储空间
+      大文本类型：text/blob ---字符数大于65535存储时使用
+#############################################################
+日期时间  datetime 占8个字节 
+日期时间  timestamp 占4个字节
+当未给timestamp字段赋值时，自动以当前系统时间赋值，而datetime字段默认赋值为null
+ 日期     date 占4个字节 范围：0001-01-01～9999-12-31
+ 年份     year 占一个字节 范围：1901～2155
+ 时间     time 占三个字节 格式：HH：MM：SS
+##########################################
+时间函数
+   now()    获取系统当前日期和时间
+   year()   获取指定时间中的年份
+   day()    获取指定时间中的日期
+   sleep(N) 休眠N秒
+   curdate() 获取当前的系统日期
+   curtime() 获取当前的系统时刻
+   month()   获取指定时间中的月份
+   date()    获取指定时间中的日期
+   time()    获取指定时间中的时刻
+#######################################
+枚举类型
+    enum(值1，值2，值3，值N)  从给定的值中选一个
+    set(值1，值2，值3，值N)   从给定的值中选一个或多个
+#####################################################
+mysql> create table t9(
+    -> name char(15),
+    -> age tinyint unsigned,
+    -> birthday date,
+    -> upclass time,
+    -> party datetime,
+    -> cs year
+    -> );
+Query OK, 0 rows affected (0.13 sec)
+
+mysql> insert into t9 values("tom",19,19940821,083000,20190214202020,1994);
+Query OK, 1 row affected (0.03 sec)
+
+mysql> select * from db1.t9;
++------+------+------------+----------+---------------------+------+
+| name | age  | birthday   | upclass  | party               | cs   |
++------+------+------------+----------+---------------------+------+
+| tom  |   19 | 1994-08-21 | 08:30:00 | 2019-02-14 20:20:20 | 1994 |
++------+------+------------+----------+---------------------+------+
+1 row in set (0.00 sec)
+####################################################
+#####################################################
+mysql> create table t10(
+    -> meetting datetime,
+    -> party timestamp
+    -> );
+Query OK, 0 rows affected (0.21 sec)
+
+mysql> insert into t10 values(20190128135823,20190128203000);
+Query OK, 1 row affected (0.03 sec)
+
+mysql> insert into t10(meetting) values(20190129112020);
+Query OK, 1 row affected (0.02 sec)
+
+mysql> insert into t10(party) values(20190214200000);
+Query OK, 1 row affected (0.03 sec)
+
+mysql> select * from t10;
++---------------------+---------------------+
+| meetting            | party               |
++---------------------+---------------------+
+| 2019-01-28 13:58:23 | 2019-01-28 20:30:00 |
+| 2019-01-29 11:20:20 | 2019-02-13 17:16:11 |
+| NULL                | 2019-02-14 20:00:00 |
++---------------------+---------------------+
+3 rows in set (0.00 sec)
+###############################################
+枚举类型
+   enum 单选    set 多选
+mysql> create table db1.t11(
+    -> name char(10),
+    -> sex enum("boy","gilr"),
+    -> hobby set("hgn","game","eat","sleep")
+    -> );
+Query OK, 0 rows affected (0.17 sec)
+
+mysql> insert into db1.t11 values("hgg","boy","hgn,eat,sleep");
+Query OK, 1 row affected (0.04 sec)
+
+mysql> insert into db1.t11 values("harry","gilr","game,hgn");
+Query OK, 1 row affected (0.06 sec)
+
+mysql> select * from db1.t11;
++-------+------+---------------+
+| name  | sex  | likes         |
++-------+------+---------------+
+| hgg   | boy  | hgn,eat,sleep |
+| harry | gilr | hgn,game      |
++-------+------+---------------+
+2 rows in set (0.00 sec)
+#######################################################
+#######################################################
+查看表的索引信息
+mysql>  show index from t6\G;
+#######################################################
+约束条件
+  null  允许为空，默认设置
+  not null 不允许为空
+  key   索引类型
+   default 设置默认值，缺省为null
+mysql> create table t1(
+    -> name char(10) not null,
+    -> age int not null default 18,
+    -> likes set("eat","game","film") default "eat"
+    -> );
+Query OK, 0 rows affected (0.21 sec)
+
+mysql> desc t1;
++-------+--------------------------+------+-----+---------+-------+
+| Field | Type                     | Null | Key | Default | Extra |
++-------+--------------------------+------+-----+---------+-------+
+| name  | char(10)                 | NO   |     | NULL    |       |
+| age   | int(11)                  | NO   |     | 18      |       |
+| likes | set('eat','game','film') | YES  |     | eat     |       |
++-------+--------------------------+------+-----+---------+-------+
+3 rows in set (0.00 sec)
+
+mysql> insert into t1(name) values("tom");
+Query OK, 1 row affected (0.02 sec)
+
+mysql> insert into t1 values("harry",20,"film,eat");
+Query OK, 1 row affected (0.04 sec)
+
+mysql> insert into t1 values(null,30,"eat");
+ERROR 1048 (23000): Column 'name' cannot be null
+
+mysql> insert into t1 values("",38,"film");
+Query OK, 1 row affected (0.02 sec)
+
+mysql> insert into t1 values("jack",28,null);
+Query OK, 1 row affected (0.10 sec)
+
+mysql> select * from t1;
++-------+-----+----------+
+| name  | age | likes    |
++-------+-----+----------+
+| tom   |  18 | eat      |
+| harry |  20 | eat,film |
+|       |  38 | film     |
+| jack  |  28 | NULL     |
++-------+-----+----------+
+4 rows in set (0.00 sec)
+
+#########################################################
+修改表结构 ----> 基本用法
+     alter table 表名  执行动作
+     add  添加字段
+     modify  修改字段类型
+     change  修改字段名
+     drop    删除字段
+     rename  修改表名
+    
+添加字段：alter table 表名 add 字段名 类型(宽度) 约束条件；
+              可加after 字段名或first
+mysql> alter table t1 add class char(7) default "abcdefg" first;
+Query OK, 0 rows affected (0.44 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> alter table t1 add email varchar(30),add qq varchar(20);
+Query OK, 0 rows affected (0.34 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> alter table t1 add sex enum("man","woman","no") default "no" after name;
+Query OK, 0 rows affected (0.35 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+
+mysql> desc t1;
++-------+--------------------------+------+-----+---------+-------+
+| Field | Type                     | Null | Key | Default | Extra |
++-------+--------------------------+------+-----+---------+-------+
+| class | char(7)                  | YES  |     | abcdefg |       |
+| name  | char(10)                 | NO   |     | NULL    |       |
+| sex   | enum('man','woman','no') | YES  |     | no      |       |
+| age   | int(11)                  | NO   |     | 18      |       |
+| likes | set('eat','game','film') | YES  |     | eat     |       |
+| email | varchar(30)              | YES  |     | NULL    |       |
+| qq    | varchar(20)              | YES  |     | NULL    |       |
++-------+--------------------------+------+-----+---------+-------+
+7 rows in set (0.00 sec)
+
+mysql> select * from t1;
++---------+-------+------+-----+----------+-------+------+
+| class   | name  | sex  | age | likes    | email | qq   |
++---------+-------+------+-----+----------+-------+------+
+| abcdefg | tom   | no   |  18 | eat      | NULL  | NULL |
+| abcdefg | harry | no   |  20 | eat,film | NULL  | NULL |
+| abcdefg |       | no   |  38 | film     | NULL  | NULL |
+| abcdefg | jack  | no   |  28 | NULL     | NULL  | NULL |
++---------+-------+------+-----+----------+-------+------+
+4 rows in set (0.00 sec)
+
+修改字段名  change
+alter table 表名 change 原字段名 新字段名 类型(宽度) 约束条件;
+当跟新类型和约束条件时，也可以修改字段类型
+
+mysql> desc t2;
++-------+--------------------------+------+-----+---------+-------+
+| Field | Type                     | Null | Key | Default | Extra |
++-------+--------------------------+------+-----+---------+-------+
+| class | char(15)                 | YES  |     | NULL    |       |
+| name  | char(10)                 | NO   | MUL | NULL    |       |
+| age   | int(11)                  | NO   | MUL | 18      |       |
+| sex   | enum('man','woman','no') | NO   |     | no      |       |
+| likes | set('eat','game','film') | YES  |     | eat     |       |
+| email | varchar(30)              | YES  |     | NULL    |       |
+| qq    | varchar(20)              | YES  |     | NULL    |       |
++-------+--------------------------+------+-----+---------+-------+
+7 rows in set (0.00 sec)
+
+修改class 字段为classroom
+mysql> alter table t2 change class classroom char(15) null default null;
+Query OK, 0 rows affected (0.04 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> desc t2;
++-----------+--------------------------+------+-----+---------+-------+
+| Field     | Type                     | Null | Key | Default | Extra |
++-----------+--------------------------+------+-----+---------+-------+
+| classroom | char(15)                 | YES  |     | NULL    |       |
+| name      | char(10)                 | NO   | MUL | NULL    |       |
+| age       | int(11)                  | NO   | MUL | 18      |       |
+| sex       | enum('man','woman','no') | NO   |     | no      |       |
+| likes     | set('eat','game','film') | YES  |     | eat     |       |
+| email     | varchar(30)              | YES  |     | NULL    |       |
+| qq        | varchar(20)              | YES  |     | NULL    |       |
++-----------+--------------------------+------+-----+---------+-------+
+7 rows in set (0.00 sec)
+
+modify 修改字段值
+修改sex 的默认值
+mysql> alter table t1 modify sex enum('man','woman','no') not null default 'no';
+Query OK, 0 rows affected (0.38 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+修改class的char值
+mysql> alter table t1 modify class char(15);
+Query OK, 4 rows affected (0.38 sec)
+Records: 4  Duplicates: 0  Warnings: 0
+
+修改age字段的位置
+mysql> alter table t1 modify age int(11) not null default 18 after name;
+Query OK, 0 rows affected (0.38 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+修改表名---表名具有唯一性，不能重名
+mysql> show tables;
++---------------+
+| Tables_in_db2 |
++---------------+
+| t1            |
++---------------+
+1 row in set (0.00 sec)
+mysql> system ls /var/lib/mysql/db2
+db.opt	t1.frm	t1.ibd
+
+mysql> alter table t1 rename t2;
+Query OK, 0 rows affected (0.12 sec)
+
+mysql> show tables;
++---------------+
+| Tables_in_db2 |
++---------------+
+| t2            |
++---------------+
+1 row in set (0.00 sec)
+
+mysql> system ls /var/lib/mysql/db2
+db.opt	t2.frm	t2.ibd
+
+删除字段 drop
+alter table 表名 drop  字段名;
+
+删除t2表中的qq字段
+mysql> alter table t2 drop qq;
+Query OK, 0 rows affected (0.45 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> desc t2;
++-----------+--------------------------+------+-----+---------+-------+
+| Field     | Type                     | Null | Key | Default | Extra |
++-----------+--------------------------+------+-----+---------+-------+
+| classroom | char(15)                 | YES  |     | NULL    |       |
+| name      | char(10)                 | NO   | MUL | NULL    |       |
+| age       | int(11)                  | NO   | MUL | 18      |       |
+| sex       | enum('man','woman','no') | NO   |     | no      |       |
+| likes     | set('eat','game','film') | YES  |     | eat     |       |
+| email     | varchar(30)              | YES  |     | NULL    |       |
++-----------+--------------------------+------+-----+---------+-------+
+6 rows in set (0.00 sec)
+
+
+##################################################
+键值类型：
+     index 普通索引
+     unique 唯一索引
+     fulltext 全文索引
+     primary key 主键
+     foreign key 外键
+###################################################
+一个表中可以有多个index字段，字段的值允许有重复，可以赋null值
+经常把做查询条件的字段设置为index字段
+index字段的key标志是mul
+索引是对记录集的多个字段进行排序的方法
+索引类型：Btree,B+tree,hash
+创建索引----> 加快检索速度
+建表时创建
+   mysql> create table t3(
+    -> name char(10),
+    -> age int(10),
+    -> class char(7),
+    -> index(name),index(age)
+    -> );
+Query OK, 0 rows affected (0.28 sec)
+
+mysql> desc t3;
++-------+----------+------+-----+---------+-------+
+| Field | Type     | Null | Key | Default | Extra |
++-------+----------+------+-----+---------+-------+
+| name  | char(10) | YES  | MUL | NULL    |       |
+| age   | int(10)  | YES  | MUL | NULL    |       |
+| class | char(7)  | YES  |     | NULL    |       |
++-------+----------+------+-----+---------+-------+
+3 rows in set (0.01 sec)
+##########################################################
+建表后创建索引（索引名一般和字段名相同）
+给name字段设置索引
+mysql> create index name on t2(name);
+Query OK, 0 rows affected (0.18 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+给age字段设置索引
+mysql> create index age on  t2(age);
+Query OK, 0 rows affected (0.18 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> desc t2;
++-------+--------------------------+------+-----+---------+-------+
+| Field | Type                     | Null | Key | Default | Extra |
++-------+--------------------------+------+-----+---------+-------+
+| class | char(15)                 | YES  |     | NULL    |       |
+| name  | char(10)                 | NO   | MUL | NULL    |       |
+| age   | int(11)                  | NO   | MUL | 18      |       |
+| sex   | enum('man','woman','no') | NO   |     | no      |       |
+| likes | set('eat','game','film') | YES  |     | eat     |       |
+| email | varchar(30)              | YES  |     | NULL    |       |
+| qq    | varchar(20)              | YES  |     | NULL    |       |
++-------+--------------------------+------+-----+---------+-------+
+7 rows in set (0.00 sec)
+
+#######################################################
+删除索引
+mysql> drop index name on t3;
+Query OK, 0 rows affected (0.13 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+####################################################
+主键具有唯一性，一个表中只有一个主键
+建表时创建主键
+mysql> create table t4(
+    -> stu_num char(9),
+    -> name char(10),
+    -> age int,
+    -> primary key(stu_num)
+    -> );
+Query OK, 0 rows affected (0.19 sec)
+
+mysql> create table t5(
+    -> stu_num char(9) primary key,
+    -> name char(10),
+    -> age int
+    -> );
+Query OK, 0 rows affected (0.22 sec)
+#########################################
+
+在已有的表中添加主键   
+给t2表中的name字段添加主键
+mysql> alter table t2 add primary key(name);
+Query OK, 0 rows affected (0.43 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> desc t2;
++-----------+--------------------------+------+-----+---------+-------+
+| Field     | Type                     | Null | Key | Default | Extra |
++-----------+--------------------------+------+-----+---------+-------+
+| classroom | char(15)                 | YES  |     | NULL    |       |
+| name      | char(10)                 | NO   | PRI | NULL    |       |
+| age       | int(11)                  | NO   | MUL | 18      |       |
+| sex       | enum('man','woman','no') | NO   |     | no      |       |
+| likes     | set('eat','game','film') | YES  |     | eat     |       |
+| email     | varchar(30)              | YES  |     | NULL    |       |
++-----------+--------------------------+------+-----+---------+-------+
+6 rows in set (0.00 sec)
+###############################################################
+删除主键
+mysql> alter table t2 drop primary key;
+Query OK, 4 rows affected (0.44 sec)
+Records: 4  Duplicates: 0  Warnings: 0
+
+mysql> desc t2;
++-----------+--------------------------+------+-----+---------+-------+
+| Field     | Type                     | Null | Key | Default | Extra |
++-----------+--------------------------+------+-----+---------+-------+
+| classroom | char(15)                 | YES  |     | NULL    |       |
+| name      | char(10)                 | NO   | MUL | NULL    |       |
+| age       | int(11)                  | NO   | MUL | 18      |       |
+| sex       | enum('man','woman','no') | NO   |     | no      |       |
+| likes     | set('eat','game','film') | YES  |     | eat     |       |
+| email     | varchar(30)              | YES  |     | NULL    |       |
++-----------+--------------------------+------+-----+---------+-------+
+6 rows in set (0.00 sec)
+########################################################################
+创建复合主键
+创建t6表，name和class复合主键
+mysql> create table t6(
+    -> name char(9),
+    -> class char(10),
+    -> status enum("yes","no"),
+    -> primary key(name,class)
+    -> );
+Query OK, 0 rows affected (0.18 sec)
+
+mysql> 
+mysql> desc t6;
++--------+------------------+------+-----+---------+-------+
+| Field  | Type             | Null | Key | Default | Extra |
++--------+------------------+------+-----+---------+-------+
+| name   | char(9)          | NO   | PRI | NULL    |       |
+| class  | char(10)         | NO   | PRI | NULL    |       |
+| status | enum('yes','no') | YES  |     | NULL    |       |
++--------+------------------+------+-----+---------+-------+
+3 rows in set (0.00 sec)
+#############################################
+测试复合主键 ----> t6表中name和class为复合主键，在多次写入数据时，name和class不可以同时一样
+mysql> select * from t6;
+Empty set (0.00 sec)
+
+mysql> insert into t6 values("tom","nsd1811","yes");
+Query OK, 1 row affected (0.02 sec)
+
+mysql> insert into t6 values("tom","nsd1812","yes");
+Query OK, 1 row affected (0.03 sec)
+
+mysql> insert into t6 values("tom","nsd1811","no");
+ERROR 1062 (23000): Duplicate entry 'tom-nsd1811' for key 'PRIMARY'
+mysql> insert into t6 values("harry","nsd1811","no");
+Query OK, 1 row affected (0.05 sec)
+
+mysql> select * from t6;
++-------+---------+--------+
+| name  | class   | status |
++-------+---------+--------+
+| harry | nsd1811 | no     |
+| tom   | nsd1811 | yes    |
+| tom   | nsd1812 | yes    |
++-------+---------+--------+
+3 rows in set (0.00 sec)
+##############################################
+
+主键与auto_increment连用(作用是让字段的值自增长)
+字段类型必须是数值型且有主键
+mysql> create table t7(
+    -> id int primary key auto_increment,
+    -> name char(10),
+    -> sex enum("man","woman")
+    -> );
+Query OK, 0 rows affected (0.14 sec)
+
+mysql> desc t7;
++-------+---------------------+------+-----+---------+----------------+
+| Field | Type                | Null | Key | Default | Extra          |
++-------+---------------------+------+-----+---------+----------------+
+| id    | int(11)             | NO   | PRI | NULL    | auto_increment |
+| name  | char(10)            | YES  |     | NULL    |                |
+| sex   | enum('man','woman') | YES  |     | NULL    |                |
++-------+---------------------+------+-----+---------+----------------+
+3 rows in set (0.00 sec)
+###################################################
+验证自增长
+mysql> insert into t7(name,sex) values("tom","man");
+Query OK, 1 row affected (0.04 sec)
+
+mysql> insert into t7(name,sex) values("harry","woman");
+Query OK, 1 row affected (0.03 sec)
+
+mysql> select * from t7;
++----+-------+-------+
+| id | name  | sex   |
++----+-------+-------+
+|  1 | tom   | man   |
+|  2 | harry | woman |
++----+-------+-------+
+2 rows in set (0.00 sec)
+
+mysql> insert into t7(name,sex) values("jie","woman");
+Query OK, 1 row affected (0.04 sec)
+
+mysql> select * from t7;
++----+-------+-------+
+| id | name  | sex   |
++----+-------+-------+
+|  1 | tom   | man   |
+|  2 | harry | woman |
+|  3 | jie   | woman |
++----+-------+-------+
+3 rows in set (0.00 sec)
+##############################################################
+mysql有记录数据的功能，例如清空t7表里的所有数据，再往t7表里
+写数据时，id号从之前的id号开始，并不是从1开始的
+
+mysql> delete from t7;
+Query OK, 3 rows affected (0.02 sec)
+
+mysql> select * from t7;
+Empty set (0.00 sec)
+
+mysql> insert into t7(name,sex) values("ggg","man");
+Query OK, 1 row affected (0.02 sec)
+
+mysql> select * from t7;
++----+------+------+
+| id | name | sex  |
++----+------+------+
+|  4 | ggg  | man  |
++----+------+------+
+1 row in set (0.00 sec)
+
+#####################################################
+mysql> desc t7;
++-------+---------------------+------+-----+---------+----------------+
+| Field | Type                | Null | Key | Default | Extra          |
++-------+---------------------+------+-----+---------+----------------+
+| id    | int(11)             | NO   | PRI | NULL    | auto_increment |
+| name  | char(10)            | YES  |     | NULL    |                |
+| sex   | enum('man','woman') | YES  |     | NULL    |                |
++-------+---------------------+------+-----+---------+----------------+
+3 rows in set (0.00 sec)
+
+删除有自增长设置的主键，直接删除主键会报错，先去除自增长，再删除主键
+mysql> alter table t7 drop primary key;
+ERROR 1075 (42000): Incorrect table definition; there can be only one auto column and it must be defined as a key
+
+mysql> alter table t7 modify id int not null;
+Query OK, 0 rows affected (0.41 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> alter table t7 drop primary key;
+Query OK, 0 rows affected (0.41 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> desc t7;
++-------+---------------------+------+-----+---------+-------+
+| Field | Type                | Null | Key | Default | Extra |
++-------+---------------------+------+-----+---------+-------+
+| id    | int(11)             | NO   |     | NULL    |       |
+| name  | char(10)            | YES  |     | NULL    |       |
+| sex   | enum('man','woman') | YES  |     | NULL    |       |
++-------+---------------------+------+-----+---------+-------+
+3 rows in set (0.00 sec)
+###########################################################
+创建外键
+mysql> create table ygt(
+    -> ygt_id int primary key auto_increment,
+    -> name char(10),
+    -> sex enum("b","g")
+    -> )engine=innodb;
+Query OK, 0 rows affected (0.19 sec)
+
+mysql> insert into ygt(name,sex) values("tom","b"),("lucy","g"),("jack","g");
+Query OK, 3 rows affected (0.05 sec)
+Records: 3  Duplicates: 0  Warnings: 0
+
+mysql> select * from ygt;
++--------+------+------+
+| ygt_id | name | sex  |
++--------+------+------+
+|      1 | tom  | b    |
+|      2 | lucy | g    |
+|      3 | jack | g    |
++--------+------+------+
+3 rows in set (0.01 sec)
+
+mysql> create table gzt(
+    -> gzt_id int,
+    -> pay float(7,2),
+    -> foreign key(gzt_id) references ygt(ygt_id) on update cascade on delete cascade
+    -> )engine=innodb;
+Query OK, 0 rows affected (0.16 sec)
+
+mysql> desc gzt;
++--------+------------+------+-----+---------+-------+
+| Field  | Type       | Null | Key | Default | Extra |
++--------+------------+------+-----+---------+-------+
+| gzt_id | int(11)    | YES  | MUL | NULL    |       |
+| pay    | float(7,2) | YES  |     | NULL    |       |
++--------+------------+------+-----+---------+-------+
+2 rows in set (0.00 sec)
+
+############################################################
+查看表gzt的外键
+mysql> show create table gzt;
+       `gzt_ibfk_1` FOREIGN KEY
+删除外键
+mysql> alter table gzt drop foreign key gzt_ibfk_1;
+#####################################################
+当表中有外键时，参考的表和字段都不能被删除，删除参考表的所有记录时，外键表的记录也全部自动被删除
+#########################################################
+########################################################
+[root@mysql50 ~]# which mysql  查看mysql的安装位置
+/usr/bin/mysql
+[root@mysql50 ~]# rpm -qf /usr/bin/mysql   查看哪个软件包产生mysql
+mysql-community-client-5.7.17-1.el7.x86_64
+###########################################################
+mysql存储引擎---mysql5.0/5.1 --->myisam  
+            --mysql5.5/5.6 --->innodb
+ mysql服务功能模块(结构体系)
+    管理工具   连接池   SQL接口  
+    分析器   优化器 文件系统
+什么是存储引擎：作为可擦拔式的组件提供mysql软件自带的功能程序和处理表的处理器
+###########################################################
+查看数据库服务支持的存储引擎： show engines;
+查看已有表的存储引擎: show create table 表名;
+mysql> create database db3;
+Query OK, 1 row affected (0.00 sec)
+
+mysql> use db3;
+Database changed
+
+mysql> create table t1(id int);
+Query OK, 0 rows affected (0.19 sec)
+
+mysql> show create table t1;
++-------+---------------------------------------------------+
+| Table | Create Table                                    |
++-------+-------------------------------------------------+
+| t1    | CREATE TABLE `t1` (
+  `id` int(11) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=latin1 |
++-------+----------------------------------------------------+
+1 row in set (0.00 sec)
+
+设置数据库服务默认使用的存储引擎 
+mysql> system vim /etc/my.cnf
+                  [mysqld]
+                  default-storage-engine=myisam
+
+mysql> system systemctl restart mysqld
+mysql> show engines;
+                 MyISAM   | DEFAULT | MyISAM storage engine
+
+修改已有的表使用的存储引擎
+      alter table 表名 engine=存储引擎; 
+创建表时设置的存储引擎：
+      create table 表名（字段名列表）engine=存储引擎;
+####################################################
+常见存储引擎的特点
+   myisam存储引擎的特点：
+         表名.frm <--- desc 表名;
+         表名.MYI <--- index(name)
+         表名.MYD <--- select * from 表名;
+       myisam存储支持表及锁，不支持事物，事物回滚，外键
+   innodb存储引擎的特点：
+         表名.frm <--- desc 表名;
+         表名.ibd <--- index(name)+select * from 表名;
+       innodb存储引擎支持行及锁 支持事物 事物回滚 外键
+#########################################################
+回滚验证
+终端1 连接数据库服务
+]# mysql -uroot -p'123456'
+mysql> create database db3;
+mysql> use db3;
+mysql> create table t6(id int)engine=innodb;
+mysql> insert into t6 values(999);
+mysql> select * from t6;
+mysql> show variables like "autocommit";
+mysql> set autocommit=off;
+终端2 连接数据库服务
+]# mysql -uroot -p'123456'
+mysql> select * from db3.t6;
+
+终端1 
+mysql> delete from db3.t6;
+mysql> select * from db3.t6;看不到数据
+终端2
+mysql> select * from db3.t6;可以看到数据(隔离性)
+
+终端1
+mysql> rollback;数据回滚
+mysql> select * from db3.t6;可以看到数据
+
+终端1 
+mysql> insert into db3.t6 values(666);
+mysql> select * from db3.t6;看到新数据
+终端2
+mysql> select * from db3.t6;看不到新数据(因为终端1未提交数据)
+
+终端1
+mysql> commit;执行提交命令
+终端2
+mysql> select * from db3.t6;看到新数据
+
+#############################################################`
+生产环境下建表时如何决定表使用哪种存储引擎   
+     查询(select)操作多的表适合使用myisam存储引擎 节省系统资源
+     写(insert update delete)操作多的表适合使用innodb存储引擎 并发访问量大
+
+##############################################################################
+查看默认检索目录
+mysql> show variables like "secure_file_priv";
++------------------+-----------------------+
+| Variable_name    | Value                 |
++------------------+-----------------------+
+| secure_file_priv | /var/lib/mysql-files/ |
++------------------+-----------------------+
+1 row in set (0.00 sec)
+
+修改默认检索目录
+mysql> system vim /etc/my.cnf
+       [mysqld]
+       secure_file_priv="/mydatadir"
+
+mysql> system mkdir /mydatadir
+mysql> system chown mysql /mydatadir
+mysql> system systemctl restart mysqld
+mysql> show variables like "secure_file_priv";
++------------------+-------------+
+| Variable_name    | Value       |
++------------------+-------------+
+| secure_file_priv | /mydatadir/ |
++------------------+-------------+
+1 row in set (0.00 sec)
+###########################################################
+#################
+数据的导入导出
+    作用：把系统文件的内容存储到数据库服务器的数据表里
+    命令格式：
+    注意事项：
+eg:把/etc/passwd文件的内容存储到db3库下的user表里，并给每一行记录添加编号
+mysql> create table db3.user(
+    -> name char(35),
+    -> password char(1),
+    -> uid int,
+    -> gid int,
+    -> comment char(150),
+    -> homedir char(100),
+    -> shell varchar(100),
+    -> index(name)
+    -> );
+Query OK, 0 rows affected (0.02 sec)
+
+mysql> desc db3.user;
++----------+--------------+------+-----+---------+-------+
+| Field    | Type         | Null | Key | Default | Extra |
++----------+--------------+------+-----+---------+-------+
+| name     | char(35)     | YES  | MUL | NULL    |       |
+| password | char(1)      | YES  |     | NULL    |       |
+| uid      | int(11)      | YES  |     | NULL    |       |
+| gid      | int(11)      | YES  |     | NULL    |       |
+| comment  | char(150)    | YES  |     | NULL    |       |
+| homedir  | char(100)    | YES  |     | NULL    |       |
+| shell    | varchar(100) | YES  |     | NULL    |       |
++----------+--------------+------+-----+---------+-------+
+7 rows in set (0.00 sec)
+
+mysql> system cp /etc/passwd /mydatadir/
+mysql> load data infile "/mydatadir/passwd" into table db3.user \
+       fields terminated by ":" lines terminated by "\n";
+Query OK, 43 rows affected (0.00 sec)
+Records: 43  Deleted: 0  Skipped: 0  Warnings: 0
+
+mysql> alter table db3.user add id int primary key auto_increment first;
+Query OK, 43 rows affected (0.02 sec)
+Records: 43  Duplicates: 0  Warnings: 0
+
+mysql> select * from db3.user;
++----+---------------------+----------+-------+-------+-----------
+| id | name                | password | uid   | gid   | comment                                                         | homedir                   | shell          |
++----+---------------------+----------+-------+-------+-----------
+   1 | root                | x        |     0 |     0 | root                                                            | /root                     | /bin/bash      |
+|  2 | bin                 | x        |     1 |     1 | bin                                                             | /bin                      | /sbin/nologin  |
+|  3 | daemon              | x        |     2 |     2 | daemon                                                          | /sbin                     | /sbin/nologin  |
+|  4 | adm                 | x        |     3 |     4 | adm                                                             | /var/adm                  | /sbin/nologin  |
+|  5 | lp                  | x        |     4 |     7 | lp                                                              | /var/spool/lpd            | /sbin/nologin  |
+|  6 | sync                | x        |     5 |     0 | sync                                                            | /sbin                     | /bin/sync      |
+|  7 | shutdown            | x        |     6 |     0 | shutdown                                                        | /sbin                     | /sbin/shutdown |
+|  8 | halt                | x        |     7 |     0 | halt                                                            | /sbin                     | /sbin/halt     |
+|  9 | mail                | x        |     8 |    12 | mail      
+    ............
+    ...............
+##################################################################################
+数据的导出
+mysql> select * from db3.user into outfile "/mydatadir/a1.txt";
+Query OK, 43 rows affected (0.01 sec)
+
+mysql> system cat /mydatadir/a1.txt
+1	root	x	0	0	root	/root	/bin/bash
+2	bin	x	1	1	bin	/bin	/sbin/nologin
+3	daemon	x	2	2	daemon	/sbin	/sbin/nologin
+4	adm	x	3	4	adm	/var/adm	/sbin/nologin
+5	lp	x	4	7	lp	/var/spool/lpd	/sbin/nologin
+6	sync	x	5	0	sync	/sbin	/bin/sync
+  .........
+mysql> select * from db3.user where id <=5 into outfile "/mydatadir/a2.txt";
+Query OK, 5 rows affected (0.01 sec)
+
+mysql> system cat /mydatadir/a2.txt
+1	root	x	0	0	root	/root	/bin/bash
+2	bin	x	1	1	bin	/bin	/sbin/nologin
+3	daemon	x	2	2	daemon	/sbin	/sbin/nologin
+4	adm	x	3	4	adm	/var/adm	/sbin/nologin
+5	lp	x	4	7	lp	/var/spool/lpd	/sbin/nologin
+mysql> select name,uid,shell from db3.user where id <=5 into outfile "/mydatadir/a3.txt"
+       fields terminated by "#";
+Query OK, 5 rows affected (0.00 sec)
+
+mysql> system cat /mydatadir/a3.txt
+root#0#/bin/bash
+bin#1#/sbin/nologin
+daemon#2#/sbin/nologin
+adm#3#/sbin/nologin
+lp#4#/sbin/nologin
+mysql> select name,uid,shell from db3.user where id <=5 into outfile "/mydatadir/a4.txt" \
+       fields terminated by "#" lines terminated by "!!!";
+Query OK, 5 rows affected (0.00 sec)
+
+mysql> system cat /mydatadir/a4.txt
+root#0#/bin/bash!!!bin#1#/sbin/nologin!!!daemon#2#/sbin/nologin!!!adm#3#/sbin/nologin!!!lp#4#/sbin/nologin!!!
+###################################################################################
+条件匹配用的user表
+mysql> select * from user;
++----+---------------------+----------+-------+-------+-----------+
+| id | name                | password | uid   | gid   | comment                                                         | homedir                   | shell          |
++----+---------------------+----------+-------+-------+-------------+
+|  1 | root                | x        |     1 |     0 | root                                                            | /root                     | /bin/bash      |
+|  2 | bin                 | x        |     2 |     1 | bin                                                             | /bin                      | /sbin/nologin  |
+|  3 | daemon              | x        |     3 |     2 | daemon                                                          | /sbin                     | /sbin/nologin  |
+|  4 | adm                 | x        |     4 |     4 | adm                                                             | /var/adm                  | /sbin/nologin  |
+|  5 | lp                  | x        |     5 |     7 | lp                                                              | /var/spool/lpd            | /sbin/nologin  |
+|  6 | sync                | x        |     6 |     0 | sync                                                            | /sbin                     | /bin/sync      |
+|  7 | shutdown            | x        |     7 |     0 | shutdown  
+     .............
+    ..............
+  41 | apache              | x        |    48 |    48 | Apache                                                          | /usr/share/httpd          | /sbin/nologin  |
+| 42 | ceph                | x        |   167 |   167 | Ceph daemons                                                    | /var/lib/ceph             | /sbin/nologin  |
+| 43 | mysql               | x        |    27 |    27 | MySQL Server                                                    | /var/lib/mysql            | /bin/false     |
+| 44 | jim1                | NULL     |  NULL |  NULL | NULL                                                            | NULL                      | NULL           |
+| 45 | jim4                | NULL     |  NULL |  NULL | NULL                                                            | NULL                      | NULL           |
+| 46 | jim5                | NULL     |  NULL |  NULL | NULL                                                            | NULL                      | NULL           |
++----+---------------------+----------+-------+-------+------------------------+
+46 rows in set (0.00 sec)
+
+匹配条件
+1 基本条件：
+     数值比较---
+mysql> select * from user where id <=3;
+mysql> select  name,uid from  user where uid=10;
+mysql> select name,uid from user where uid <=10;
+mysql> select name,uid,gid from user where uid=gid;
+mysql> select name,uid,gid from user where uid !=gid;
+mysql> select name,uid,gid from user where 1<2;
+      字符比较：
+mysql> select name from user where name !="mysql";
+mysql> select name from user where name="mysql";
+mysql> select name,shell from user where shell="/bin/bash";
+mysql> select id from user where shell is null;
+mysql> select id from user where shell is not null;
+2 高级匹配 
+      逻辑与  and 
+mysql> select name,uid,shell from user where name="apache" and 
+       uid=88 and shell="sbin/nologin";
+     
+      逻辑或  or
+mysql> select name,uid,shell from user where name="apache" or
+       uid=88 or shell="/sbin/nologin";
+
+      逻辑非  not或!
+mysql> select name from user where name != "mysql"; # = 匹配等于，!= 匹配不等于
+mysql> select id from user where shell is not null; #is not null 匹配非空，is null 匹配空
+      范围内匹配:in (值列表)               在...里  
+                 between 数字1 and 数字2   在...之间 
+                 distinct 字段名           去重显示
+mysql> select name from user where shell not in ("bin/login","/sbin/nologin");
+mysql> select * from user  where id between 10 and 20;
+      去重显示
+mysql> select distinct shell from user;
+      模糊查询：_ 匹配单个字符，% 匹配0--N个字符
+匹配四个字符的name
+mysql> select name from user where name like "____"; #一个_代表一个字符
+
+匹配包含r的name
+mysql> select name from user where name like "%r%"; #包含r的
+
+匹配以r开头的name
+mysql> select name from user where name like "r%";#以r开头的
+
+匹配四个及四个以上的name
+mysql> select name from user where name like "__%__";#四个及四个以上的
+
+      正则表达式：where 字段名 regexp '正则表达式'
+                  ^ 以什么开头
+                  $ 以什么结尾
+                  . 任意一个字符
+                  * 任意个任意字符
+                  [] 匹配该范围内一个字符
+                  |  或着
+匹配以r或以a开头的name
+mysql> select name from user where name regexp '^r|^a';
+
+匹配以r开头且以t结尾的name
+mysql> select name from user where name regexp '^r.*t$';
+
+匹配包含数字的name
+mysql> select name from user where name regexp '[0-9]';
+
+       四则运算
+给uid小于等于10的uid加1
+mysql> update user set uid=uid+1 where uid <=10;
+
+将name为root的uid和gid加起来，结果字段设为ruslet
+mysql> select name,uid,gid,uid+gid ruslet from user where name="root"; 
++------+------+------+--------+
+| name | uid  | gid  | ruslet |
++------+------+------+--------+
+| root |    1 |    0 |      1 |
++------+------+------+--------+
+1 row in set (0.00 sec)
+
+求平均值，其结果字段设为pjz
+mysql> select name,uid,gid,(uid+gid)/2  pjz from user where name="mysql";# ()提高优先级
++-------+------+------+---------+
+| name  | uid  | gid  | pjz     |
++-------+------+------+---------+
+| mysql |   27 |   27 | 27.0000 |
++-------+------+------+---------+
+1 row in set (0.00 sec)
+######################################################################
+#######################################################################
+操作查询结果
+     聚集函数：sum(字段名) avg(字段名)
+               min(字段名) max(字段名) 
+               count(字段名)
+mysql> select count(name) from user;
+mysql> select count(name) from user where shell="/bin/bash";
+mysql> select avg(uid) from user;
+mysql> select sum(uid) from user;
+mysql> select min(uid) from user;
+mysql> select max(uid) from user;
+mysql> select min(uid) from user where shell != "/bin/bash";
+mysql> select max(uid),max(gid) from user;
+mysql> select count(*) from user;
+      
+     排序 order by 字段名
+mysql> select name,uid from user where between 10 and 1000 order by uid;
+mysql> select name,uid from user where uid between 10 and 1000 order by uid desc;
+     分组 group by 字段名
+mysql> select shell from user where uid between 10 and 1000 group by shell;
+mysql> select shell from user group by shell;
+     过滤 having 查询条件
+mysql> select name from user where uid between 10 and 60000 having name="rsync";
+mysql> select name from user where uid between 10 and 60000 having name="ftp";
+     限制显示行数 limit 4 显示前4行
+                  limit 2,5 从第三行开始显示5行
+mysql> select name from user where uid between 10 and 6000 limit 2;
+mysql> select name from user where uid between 10 and 6000 limit 4,5;
+综合应用：desc 降序  默认是升序
+mysql> select * from user where shell != "/bin/bash" order by uid desc limit 3;
+mysql> select * from user where shell !="/bin/bash" order by uid limit 1; 
+####################################################################################
+#######################################################################################                 

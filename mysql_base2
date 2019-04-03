@@ -1,0 +1,803 @@
+多表查询
+    复制表：作用：1 备份表
+                  2 快速建表
+            命令格式：create table 库名.表名 sql语句;
+            注意：备份和复制出来的表没有原表的键值属性
+备份表：
+mysql> create table userbak select * from db3.user;
+Query OK, 46 rows affected (0.04 sec)
+Records: 46  Duplicates: 0  Warnings: 0
+
+mysql> select * from userbak;
+
+复制表结构，不要数据
+mysql> create table user1 select * from db3.user where 1=2;
+Query OK, 0 rows affected (0.02 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> desc user1;
++----------+--------------+------+-----+---------+-------+
+| Field    | Type         | Null | Key | Default | Extra |
++----------+--------------+------+-----+---------+-------+
+| id       | int(11)      | NO   |     | 0       |       |
+| name     | char(35)     | YES  |     | NULL    |       |
+| password | char(1)      | YES  |     | NULL    |       |
+| uid      | int(11)      | YES  |     | NULL    |       |
+| gid      | int(11)      | YES  |     | NULL    |       |
+| comment  | char(150)    | YES  |     | NULL    |       |
+| homedir  | char(100)    | YES  |     | NULL    |       |
+| shell    | varchar(100) | YES  |     | NULL    |       |
++----------+--------------+------+-----+---------+-------+
+8 rows in set (0.00 sec)
+
+mysql> 
+mysql> select * from user1;
+Empty set (0.00 sec)
+
+结构和内容一起复制
+mysql> create table user3 select name,uid,shell from db3.user order by uid desc limit 5;
+Query OK, 5 rows affected (0.03 sec)
+Records: 5  Duplicates: 0  Warnings: 0
+
+mysql> select * from user3;
++----------------+-------+---------------+
+| name           | uid   | shell         |
++----------------+-------+---------------+
+| nfsnobody      | 65534 | /sbin/nologin |
+| student        |  1000 | /bin/bash     |
+| polkitd        |   999 | /sbin/nologin |
+| libstoragemgmt |   998 | /sbin/nologin |
+| colord         |   997 | /sbin/nologin |
++----------------+-------+---------------+
+5 rows in set (0.00 sec)
+
+只复制表的部分结构，不要数据
+mysql> create table user4 select name,uid,shell from db3.user where 1=2;
+Query OK, 0 rows affected (0.06 sec)
+Records: 0  Duplicates: 0  Warnings: 0
+
+mysql> select * from user4;
+Empty set (0.00 sec)
+
+mysql> desc user4;
++-------+--------------+------+-----+---------+-------+
+| Field | Type         | Null | Key | Default | Extra |
++-------+--------------+------+-----+---------+-------+
+| name  | char(35)     | YES  |     | NULL    |       |
+| uid   | int(11)      | YES  |     | NULL    |       |
+| shell | varchar(100) | YES  |     | NULL    |       |
++-------+--------------+------+-----+---------+-------+
+3 rows in set (0.00 sec)
+带限制条件的复制   limit 3; 显示前三行
+                   limit 5,6;从第六行开始，显示6行
+mysql> create table t3 select name,uid,shell,password from db3.user limit 3;#前三行
+Query OK, 3 rows affected (0.03 sec)
+Records: 3  Duplicates: 0  Warnings: 0
+                             
+mysql> create table t5 select name,gid,uid,homedir from db3.user limit 5,6;
+Query OK, 5 rows affected (0.05 sec)                  
+Records: 5  Duplicates: 0  Warnings: 0
+##################################################################################
+    多表查询的方法
+         1,多表查询
+         2,嵌套查询
+         3,左连接查询
+         4,右连接查询
+多表查询
+     select 字段名列表 from 表名列表;---> 第卡尔集
+     select 字段名列表 from 表名列表 where 匹配条件;
+       仅显示与条件匹配的记录
+
+没有匹配条件的多表查询，字段结果为两表字段数相乘
+mysql> select * from t3,t5;
++--------+------+---------------+----------+--------+------+------+----------------+
+| name   | uid  | shell         | password | name   | gid  | uid  | homedir        |
++--------+------+---------------+----------+--------+------+------+----------------+
+| root   |    1 | /bin/bash     | x        | root   |    0 |    1 | /root          |
+| bin    |    2 | /sbin/nologin | x        | root   |    0 |    1 | /root          |
+| daemon |    3 | /sbin/nologin | x        | root   |    0 |    1 | /root          |
+| root   |    1 | /bin/bash     | x        | bin    |    1 |    2 | /bin           |
+| bin    |    2 | /sbin/nologin | x        | bin    |    1 |    2 | /bin           |
+| daemon |    3 | /sbin/nologin | x        | bin    |    1 |    2 | /bin           |
+| root   |    1 | /bin/bash     | x        | daemon |    2 |    3 | /sbin          |
+| bin    |    2 | /sbin/nologin | x        | daemon |    2 |    3 | /sbin          |
+| daemon |    3 | /sbin/nologin | x        | daemon |    2 |    3 | /sbin          |
+| root   |    1 | /bin/bash     | x        | adm    |    4 |    4 | /var/adm       |
+| bin    |    2 | /sbin/nologin | x        | adm    |    4 |    4 | /var/adm       |
+| daemon |    3 | /sbin/nologin | x        | adm    |    4 |    4 | /var/adm       |
+| root   |    1 | /bin/bash     | x        | lp     |    7 |    5 | /var/spool/lpd |
+| bin    |    2 | /sbin/nologin | x        | lp     |    7 |    5 | /var/spool/lpd |
+| daemon |    3 | /sbin/nologin | x        | lp     |    7 |    5 | /var/spool/lpd |
++--------+------+---------------+----------+--------+------+------+----------------+
+15 rows in set (0.00 sec)
+
+mysql> select t3.name,t3.uid,t5.name from t3,t5;
++--------+------+--------+
+| name   | uid  | name   |
++--------+------+--------+
+| root   |    1 | root   |
+| bin    |    2 | root   |
+| daemon |    3 | root   |
+| root   |    1 | bin    |
+| bin    |    2 | bin    |
+| daemon |    3 | bin    |
+| root   |    1 | daemon |
+| bin    |    2 | daemon |
+| daemon |    3 | daemon |
+| root   |    1 | adm    |
+| bin    |    2 | adm    |
+| daemon |    3 | adm    |
+| root   |    1 | lp     |
+| bin    |    2 | lp     |
+| daemon |    3 | lp     |
++--------+------+--------+
+15 rows in set (0.00 sec)
+
+mysql> select t3.name,t3.uid,t5.* from t3,t5;
++--------+------+--------+------+------+----------------+
+| name   | uid  | name   | gid  | uid  | homedir        |
++--------+------+--------+------+------+----------------+
+| root   |    1 | root   |    0 |    1 | /root          |
+| bin    |    2 | root   |    0 |    1 | /root          |
+| daemon |    3 | root   |    0 |    1 | /root          |
+| root   |    1 | bin    |    1 |    2 | /bin           |
+| bin    |    2 | bin    |    1 |    2 | /bin           |
+| daemon |    3 | bin    |    1 |    2 | /bin           |
+| root   |    1 | daemon |    2 |    3 | /sbin          |
+| bin    |    2 | daemon |    2 |    3 | /sbin          |
+| daemon |    3 | daemon |    2 |    3 | /sbin          |
+| root   |    1 | adm    |    4 |    4 | /var/adm       |
+| bin    |    2 | adm    |    4 |    4 | /var/adm       |
+| daemon |    3 | adm    |    4 |    4 | /var/adm       |
+| root   |    1 | lp     |    7 |    5 | /var/spool/lpd |
+| bin    |    2 | lp     |    7 |    5 | /var/spool/lpd |
+| daemon |    3 | lp     |    7 |    5 | /var/spool/lpd |
++--------+------+--------+------+------+----------------+
+15 rows in set (0.00 sec)
+
+有条件的多表查询
+mysql> select * from t3,t5 where t3.name=t5.name;
++--------+------+---------------+----------+--------+------+------+---------+
+| name   | uid  | shell         | password | name   | gid  | uid  | homedir |
++--------+------+---------------+----------+--------+------+------+---------+
+| root   |    1 | /bin/bash     | x        | root   |    0 |    1 | /root   |
+| bin    |    2 | /sbin/nologin | x        | bin    |    1 |    2 | /bin    |
+| daemon |    3 | /sbin/nologin | x        | daemon |    2 |    3 | /sbin   |
++--------+------+---------------+----------+--------+------+------+---------+
+3 rows in set (0.00 sec)
+
+mysql> select * from t3,t5 where t3.name="root" and t5.name="root";
++------+------+-----------+----------+------+------+------+---------+
+| name | uid  | shell     | password | name | gid  | uid  | homedir |
++------+------+-----------+----------+------+------+------+---------+
+| root |    1 | /bin/bash | x        | root |    0 |    1 | /root   |
++------+------+-----------+----------+------+------+------+---------+
+1 row in set (0.00 sec)
+#############################################################
+嵌套查询（where 子查询）:把内层查询结果作为外层查询的条件
+mysql> select name,uid from userbak 
+       where uid <  (select avg(uid) from userbak );
+mysql> select name from db3.t2 
+       where name in (select name from db3.user where shell !="/bin/bash");
+###########################################################
+左连接查询 left join
+     作用：查询条件成立时，以左边的表为主显示查询记录
+     命令格式：
+         select 字段名列表 from 表1 left join 表2 on 匹配条件;
+右连接查询 right join
+     作用：查询条件成立时，以右边的表为主显示查询记录
+     命令格式：
+         select 字段名列表 from 表1 right join 表2 on 匹配条件;
+mysql> select * from t4;
++--------+------+---------------+
+| name   | uid  | shell         |
++--------+------+---------------+
+| root   |    1 | /bin/bash     |
+| bin    |    2 | /sbin/nologin |
+| daemon |    3 | /sbin/nologin |
++--------+------+---------------+
+3 rows in set (0.00 sec)
+
+mysql> select * from t8;
++--------+------+---------------+
+| name   | uid  | shell         |
++--------+------+---------------+
+| root   |    1 | /bin/bash     |
+| bin    |    2 | /sbin/nologin |
+| daemon |    3 | /sbin/nologin |
+| adm    |    4 | /sbin/nologin |
+| lp     |    5 | /sbin/nologin |
+| sync   |    6 | /bin/sync     |
++--------+------+---------------+
+6 rows in set (0.00 sec)
+
+左连接查询
+mysql> select * from t4 left join t8 on t4.uid=t8.uid;
++--------+------+---------------+--------+------+---------------+
+| name   | uid  | shell         | name   | uid  | shell         |
++--------+------+---------------+--------+------+---------------+
+| root   |    1 | /bin/bash     | root   |    1 | /bin/bash     |
+| bin    |    2 | /sbin/nologin | bin    |    2 | /sbin/nologin |
+| daemon |    3 | /sbin/nologin | daemon |    3 | /sbin/nologin |
++--------+------+---------------+--------+------+---------------+
+3 rows in set (0.00 sec)
+
+右连接查询
+mysql> select * from t4 right join t8 on t4.uid=t8.uid;
++--------+------+---------------+--------+------+---------------+
+| name   | uid  | shell         | name   | uid  | shell         |
++--------+------+---------------+--------+------+---------------+
+| root   |    1 | /bin/bash     | root   |    1 | /bin/bash     |
+| bin    |    2 | /sbin/nologin | bin    |    2 | /sbin/nologin |
+| daemon |    3 | /sbin/nologin | daemon |    3 | /sbin/nologin |
+| NULL   | NULL | NULL          | adm    |    4 | /sbin/nologin |
+| NULL   | NULL | NULL          | lp     |    5 | /sbin/nologin |
+| NULL   | NULL | NULL          | sync   |    6 | /bin/sync     |
++--------+------+---------------+--------+------+---------------+
+6 rows in set (0.00 sec)
+######################################################
+MySQL服务图形工具---> phpmyadmin
+部署步骤：
+部署phpmyadmin运行环境
+   yum -y install httpd php php-mysql
+   systemctl restart httpd 
+   systemctl enable httpd
+   netstat -utnpl | grep :80
+安装phpmyadmin软件
+     phpMyAdmin-2.11.11-all-languages.tar.gz
+[root@mysql50 jhh]# tar -xvf phpMyAdmin-2.11.11-all-languages.tar.gz 
+[root@mysql50 jhh]# ls
+     phpMyAdmin-2.11.11-all-languages
+[root@mysql50 jhh]# mkdir /var/www/html/admin
+[root@mysql50 jhh]# mv phpMyAdmin-2.11.11-all-languages/* /var/www/html/admin
+[root@mysql50 jhh]# cd /var/www/html/admin
+[root@mysql50 admin]# ls
+browse_foreigners.php  pmd_relation_upd.php
+calendar.php           pmd_save_pos.php
+ChangeLog              print.css
+................
+   还有好多文件
+....................
+修改软件的主配文件
+[root@mysql50 admin]# cp config.sample.inc.php config.inc.php 
+[root@mysql50 admin]# vim config.inc.php
+  17 $cfg['blowfish_secret'] = 'jhh123';
+        
+在客户端访问软件
+在浏览器输入网址 http://192.168.4.50/admin
+
+使用数据库管理员登陆
+用户名 root
+密码  123456
+
+在图形界面里管理数据
+    
+#####################################################
+用户授权与权限撤销
+恢复数据库管理员的密码：
+[root@mysql50 admin]# systemctl stop mysqld
+[root@mysql50 admin]# vim /etc/my.cnf
+            [mysqld]   
+            #validate_password_policy=0
+            #validate_password_length=6
+            skip_grant_tables #跳过授权，无密码登陆
+[root@mysql50 admin]# systemctl restart mysqld
+[root@mysql50 admin]# mysql
+mysql> update mysql.user set authentication_string=password("654321") where host="localhost" and user="root";
+Query OK, 1 row affected, 1 warning (0.00 sec)
+Rows matched: 1  Changed: 1  Warnings: 1
+
+mysql> flush privileges;#刷新配置
+Query OK, 0 rows affected (0.00 sec)
+
+mysql> quit;
+Bye
+[root@mysql50 admin]# systemctl stop mysqld
+[root@mysql50 admin]# vim /etc/my.cnf
+            [mysqld]   
+            validate_password_policy=0
+            validate_password_length=6
+            #skip_grant_tables #跳过授权，无密码登陆
+
+[root@mysql50 admin]# systemctl restart mysqld
+[root@mysql50 admin]# mysql -uroot -p654321
+
+设置数据库管理员密码：
+[root@mysql50 admin]# mysqladmin -uroot -p password "123456" #新密码
+Enter password: 旧密码
+mysqladmin: [Warning] Using a password on the command line interface can be insecure.
+Warning: Since password will be sent to server in plain text, use ssl connection to ensure password safety.
+[root@mysql50 admin]# mysql -uroot -p"新密码"
+mysql>
+################################################################################
+授权库mysql，主要的几个表
+  user表：存储授权用户的访问权限
+  db表：存储授权用户对数据库的访问权限
+  tables_priv表：存储授权用户对表的访问权限
+  columns_priv表：存储授权用户对字段的访问权限
+
+添加授权用户
+[root@mysql50 admin]# mysql -uroot -p123456
+
+添加mydba用户
+mysql> grant all on *.* to mydba@"%" identified by "123456" with grant option;
+Query OK, 0 rows affected, 1 warning (0.00 sec)
+
+查看授权用户
+mysql> select * from mysql.user where user="mydba" \G;#\G是竖着显示
+mysql> select host,user from mysql.user;
++-----------+-----------+
+| host      | user      |
++-----------+-----------+
+| %         | mydba     |
+| localhost | mysql.sys |
+| localhost | root      |
++-----------+-----------+
+3 rows in set (0.00 sec)
+
+mysql> show grants for mydba@"%";
++--------------------------------------------------------------+
+| Grants for mydba@%                                           |
++--------------------------------------------------------------+
+| GRANT ALL PRIVILEGES ON *.* TO 'mydba'@'%' WITH GRANT OPTION |
++--------------------------------------------------------------+
+1 row in set (0.00 sec)
+
+测试授权
+在主机51上连接数据库服务器50
+[root@mysql51 admin]# mysql -h192.168.4.50 -umydba -p123456
+
+mysql> select user();#查看连接的用户名和客户端地址
++---------------+
+| user()        |
++---------------+
+| mydba@mysql51 |
++---------------+
+1 row in set (0.00 sec)
+
+mysql> select @@hostname;#显示服务器主机名
++------------+
+| @@hostname |
++------------+
+| mysql50    |
++------------+
+1 row in set (0.00 sec)
+
+mysql> show grants; #显示访问权限
++--------------------------------------------------------------+
+| Grants for mydba@%                                           |
++--------------------------------------------------------------+
+| GRANT ALL PRIVILEGES ON *.* TO 'mydba'@'%' WITH GRANT OPTION |
++--------------------------------------------------------------+
+1 row in set (0.01 sec)
+
+mysql> create,drop,insert,update 测试对数据的访问权限
+
+测试授权权限
+添加本地admin用户并授予select,insert 权限
+mysql> grant select,insert on db3.user to admin@"localhost" identified by "123456";
+
+在数据库服务器50本机测试myadmin 添加的授权用户admin
+[root@mysql50 admin]# mysql -hlocal -uadmin -p123456
+mysql> select user();
+mysql> select @@hostname;
+mysql> show grants;
+mysql> 测试对数据库的访问权限create  drop  insert select
+
+撤销授权
+
+删除授权的用户
+mysql> drop user mydba@"%";
+msyql> select host,user from mysql.user;
+#############################################################################################################
+数据备份与数据恢复--
+数据备份方式：物理备份和逻辑备份
+数据备份策略：完全备份：备份所有数据
+              差异备份：备份完全备份后，所有新产生的数据
+              增量备份：备份上次备份后，所有新产生的数据
+生产环境下通常使用的备份策略：
+       完全+差异
+       完全+增量--重点掌握
+##############################################################
+   物理备份：
+        50主机
+          mkdir  /mysqlbak   
+          tar  -zcvf /mysqlbak/mysql.tar.gz  /var/lib/mysql/*
+          scp  /mysqlbak/mysql.tar.gz  root@192.168.4.51:/root/
+   物理恢复：   
+        51主机
+          systemctl stop mysqld
+          rm -rf /var/lib/mysql
+          cd  /root
+          tar  -zxvf mysql.tar.gz
+          ls  ./var/lib/mysql
+          cp  -r ./var/lib/mysql /var/lib/
+          ls  /var/lib/mysql
+          chown -R mysql:mysql /var/lib/mysql
+          systemctl restart mysqld
+          mysql -uroot -p123456
+       mysql> show databases;
+   逻辑备份：使用命令对数据备份，根据执行备份时已有的数据，自动生成对应的数据文件
+   逻辑恢复：使用命令调用备份文件，做数据恢复
+
+逻辑备份的三种方法
+1 完全备份 mysqldump
+   备份命令：mysqldump -uroot -p密码 数据库名 >  备份文件名.sql 
+[root@mysql50 ~]# mysqldump -uroot -p123456 
+                --all-databases > /mysqlbak/all.sql
+mysqldump: [Warning] Using a password on the command line interface can be insecure.
+
+[root@mysql50 ~]# mysqldump -uroot -p123456 db1 > /mysqlbak/db1.sql
+mysqldump: [Warning] Using a password on the command line interface can be insecure.
+
+[root@mysql50 ~]# mysqldump -uroot -p123456 db3 user > /mysqlbak/db3_user.sql
+mysqldump: [Warning] Using a password on the command line interface can be insecure.
+
+[root@mysql50 ~]# mysqldump -uroot -p123456  -B db2 db4 > /mysqlbak/db2_4.sql
+mysqldump: [Warning] Using a password on the command line interface can be insecure.
+
+[root@mysql50 ~]# ls /mysqlbak/*.sql
+/mysqlbak/all.sql  /mysqlbak/db2_4.sql
+/mysqlbak/db1.sql  /mysqlbak/db3_user.sql
+
+利用备份文件数据的恢复
+[root@mysql50 ~]# scp /mysqlbak/db3_user.sql root@192.168.4.51:/root/
+db3_user.sql                    100% 5072     6.8MB/s   00:00    
+
+[root@mysql51 ~]# mysql -uroot -p123456
+mysql> show databases;
+mysql> use db3;
+mysql> show tables;
+mysql> drop table user;
+Query OK, 0 rows affected (0.00 sec)
+
+[root@mysql51 ~]# mysql -uroot -p123456 db3 < /root/db3_user.sql
+
+[root@mysql51 ~]# mysql -uroot -p123456
+mysql> select * from db3.user;
+#################################################################
+###################################################################
+2 实时增量备份/恢复 binlog日志
+    binlog日志介绍：是mysql服务日志文件的一种，又叫二进制日志，记录在服务器上执行的除了查询的sql语句
+    启用系统默认的binlog日志
+       vim /etc/my.cnf
+          [mysqld]
+            server_id=50
+            log-bin
+       systemctl restart mysqld
+       mysql -uroot -p123456
+       mysql> show master status; #查看日志文件
+       ]# cd /var/lib/mysql
+       ]# ls
+        主机名-bin.000001  #日志文件
+        主机名-bin.index   #索引文件
+###################################################
+     自定义binlog日志文件的存储目录和日志文件名
+          vim /etc/my.cnf
+             [mysqld]
+                server_id=50
+                #log-bin
+                log-bin=/logdir/jhh
+                 #指定日志文件的目录和名称
+         ]#  mkdir /logdir
+         ]#  chown mysql /logdir
+         ]#  systemctl restart mysqld
+         ]# mysql -uroot -p123456
+         mysql> show master status;
+         ]# ls /logdir/jhh*
+######################################################
+    手动创建新的binlog日志文件
+         ]# systemctl restart mysqld
+         ]# mysql -uroot -p123456
+         mysql> flush logs;
+    或
+         ]# mysql -uroot -p123456 -e "flush logs"
+         ]# mysqldump -uroot -p123456 --flush-logs db1 > /mysqlbak/db1.sql
+#############################################
+     删除已有的日志文件
+       mysql> purge master logs to "mysql50-bin.000005";
+       mysql> reset master;
+###########################################################################
+利用日志文件恢复数据
+[root@mysql50 ~]# vim /etc/my.cnf
+[mysqld]
+server_id=50
+#log-bin
+log-bin=/logdir/jhh
+binlog_format="mixed"
+
+[root@mysql50 ~]# mkdir /logdir
+[root@mysql50 ~]# chown mysql /logdir
+[root@mysql50 ~]# ls /logdir/jhh.00 按tab
+[root@mysql50 ~]# systemctl restart mysqld
+[root@mysql50 ~]# mysql -uroot -p123456
+重置主服务器
+mysql> reset master;
+Query OK, 0 rows affected (0.07 sec)
+
+查看主服务器使用的日志
+mysql> show master status;
++------------+----------+--------------+------------------+-------------------+
+| File       | Position | Binlog_Do_DB | Binlog_Ignore_DB | Executed_Gtid_Set |
++------------+----------+--------------+------------------+-------------------+
+| jhh.000001 |      154 |              |                  |                   |
++------------+----------+--------------+------------------+-------------------+
+1 row in set (0.00 sec)
+
+mysql> show databases;
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| db1                |
+| db2                |
+| db3                |
+| db4                |
+| mysql              |
+| performance_schema |
+| sys                |
++--------------------+
+8 rows in set (0.00 sec)
+
+mysql> use db1;
+Database changed
+mysql> show tables;
+Empty set (0.00 sec)
+
+mysql> create table t1(
+    -> name char(10),
+    -> age int
+    -> );
+Query OK, 0 rows affected (0.20 sec)
+
+mysql> insert into t1 values("tom",10);
+Query OK, 1 row affected (0.04 sec)
+
+mysql> insert into t1 values("tom",20);
+Query OK, 1 row affected (0.04 sec)
+
+mysql> insert into t1 values("tom",30);
+Query OK, 1 row affected (0.04 sec)
+
+mysql> insert into t1 values("tom",40);
+Query OK, 1 row affected (0.03 sec)
+
+[root@mysql50 ~]# scp /logdir/jhh.000001 root@192.168.4.51:/root/
+jhh.000001          100% 1436    85.1KB/s   00:00    
+
+查看日志内容
+[root@mysql51 ~]# mysqlbinlog /root/jhh.000001 
+/*!50530 SET @@SESSION.PSEUDO_SLAVE_MODE=1*/;
+/*!50003 SET @OLD_COMPLETION_TYPE=@@COMPLETION_TYPE,COMPLETION_TYPE=0*/;
+DELIMITER /*!*/;
+# at 4
+..............还有很多......
+
+利用日志文件恢复数据
+执行日志文件里的所有sql命令
+[root@mysql51 ~]# mysqlbinlog /root/jhh.000001 | mysql -uroot -p123456 
+
+mysql> select * from db1.t1;
++------+------+
+| name | age  |
++------+------+
+| tom  |   10 |
+| tom  |   20 |
+| tom  |   30 |
+| tom  |   40 |
++------+------+
+4 rows in set (0.00 sec)
+仅执行指定范围内记录的sql命令
+[root@mysql51 ~]# mysqlbinlog --start-position=577 --stop-position=1405 /root/jhh.000001 | mysql -uroot -p123456
+
+mysql> select * from db1.t1;
++------+------+
+| name | age  |
++------+------+
+| tom  |   10 |
+| tom  |   20 |
+| tom  |   30 |
+| tom  |   40 |
+| tom  |   20 |
+| tom  |   30 |
++------+------+
+6 rows in set (0.00 sec)
+######################################################
+
+3 安装软件提供备份命令 innobackupex 
+    安装libev-4.15-1.el6.rf.x86_64.rpm
+        percona-xtrabackup-24-2.4.7-1.el7.x86_64.rpm
+     yum -y install libev-4.15-1.el6.rf.x86_64.rpm
+     yum -y install percona-xtrabackup-24-2.4.7-1.el7.x86_64.rpm
+[root@mysql50 mysql]# which innobackupex 查看安装位置
+/usr/bin/innobackupex
+命令格式：
+
+数据的备份与恢复
+准备工作：
+mysql> drop database db5;
+mysql> create database db5;
+mysql> use db5;
+Database changed
+mysql> create table a(
+    -> id int
+    -> );
+Query OK, 0 rows affected (0.17 sec)
+mysql> insert into db5.a values(1),(3),(4),(5),(6);
+完全备份：不用创建备份目录，命令会自动创建，指定一个新的目录
+[root@mysql50 ~]# innobackupex --user root --password 123456 /allbak --no-timestamp #不使用日期
+
+[root@mysql50 ~]# ls /allbak
+backup-my.cnf   mysql                   xtrabackup_checkpoints
+db5             performance_schema      xtrabackup_info
+ib_buffer_pool  sys                     xtrabackup_logfile
+ibdata1         xtrabackup_binlog_info
+数据恢复：
+准备恢复数据：
+ot@mysql50 ~]# cat /allbak/xtrabackup_checkpoints 
+backup_type = full-backuped
+from_lsn = 0
+to_lsn = 3266916
+last_lsn = 3266925
+compact = 0
+recover_binlog_info = 0
+[root@mysql50 ~]# innobackupex --apply-log /allback
+190219 10:10:33 innobackupex: Starting the apply-log operation
+
+IMPORTANT: Please check that the apply-log run completes successfully.
+...........
+[root@mysql50 ~]# cat /allbak/xtrabackup_checkpoints 
+backup_type = full-prepared
+from_lsn = 0
+to_lsn = 3266916
+last_lsn = 3266925
+compact = 0
+recover_binlog_info = 0
+把备份目录下的数据拷贝到数据库目录下：
+[root@mysql50 ~]# systemctl stop mysqld.service 
+[root@mysql50 ~]# rm -rf /var/lib/mysql/*
+[root@mysql50 ~]# innobackupex --copy-back /allbak
+190219 10:12:38 innobackupex: Starting the copy-back operation
+...........
+190219 10:12:47 [01] Copying ./ibtmp1 to /var/lib/mysql/ibtmp1
+190219 10:12:47 [01]        ...done
+190219 10:12:47 completed OK!
+[root@mysql50 ~]# ls -l /var/lib/mysql
+总用量 188456
+drwxr-x--- 2 root root       46 2月  19 10:12 db5
+-rw-r----- 1 root root      526 2月  19 10:12 ib_buffer_pool
+.........
+[root@mysql50 ~]# chown -R mysql:mysql /var/lib/mysql
+[root@mysql50 ~]# systemctl restart mysqld
+[root@mysql50 ~]# mysql -uroot -p123456
+mysql> show databases;
+####把50的备份文件恢复到51的数据库服务器上
+方法一：
+[root@mysql50 ~]# ls /allbak/
+[root@mysql50 ~]# tar -zcvf all.tar.gz /allbak/*
+[root@mysql50 ~]# scp all.tar.gz root@192.168.4.51:/root/
+[root@mysql51 ~]# ls /root/
+[root@mysql51 ~]# systemctl stop mysqld
+[root@mysql51 ~]# rm -rf /var/lib/mysql/*
+[root@mysql51 ~]# mkdir /allbak2
+[root@mysql51 ~]# chown -R mysql:mysql /allbak2
+[root@mysql51 ~]# tar -xf all.tar.gz -C /allbak2/
+[root@mysql51 ~]# systemctl restart mysqld
+[root@mysql51 ~]# mysql -uroot -p123456
+mysql> show databases;
+方法二：
+[root@mysql50 ~]# scp -r /allbak root@192.168.4.51:/
+[root@mysql51 ~]# 安装libev-软件  percon软件，停止mysqld服务
+删除mysql目录下所有数据 
+[root@mysql51 ~]# innibackup --copy-back /allbak
+[root@mysql51 ~]# chown -R mysql:mysql /allbak
+[root@mysql51 ~]# systemctl restart mysqld
+[root@mysql51 ~]# mysql -uroot -p123456
+mysql> show databases;
+#################################################
+完备：将数据库的所有数据备份到/fullbak目录下
+[root@mysql50 ~]# innobackupex --user root --password 123456 /fullbak --no-timestamp
+[root@mysql50 ~]# mysql -uroot -p123456
+mysql>  insert into db5.a values(77);
+mysql>  insert into db5.a values(88);
+mysql>  insert into db5.a values(99);
+mysql>  insert into db5.a values(66);
+mysql>  insert into db5.a values(55);
+mysql>  insert into db5.a values(44);
+mysql> select *from db5.a;
+
+增量备份：
+周一：将完全备份后新增的数据备份到/new1dir 目录下
+[root@mysql50 ~]# innobackupex --user root --password 123456 \
+ --incremental /new1dir --incremental-basedir=/fullbak --no-timestamp
+190219 11:52:40 innobackupex: Starting the backup operation
+
+IMPORTANT: Please check that the backup run completes successfully.
+........
+[root@mysql50 ~]# cat /new1dir/xtrabackup_checkpoints 
+backup_type = incremental
+from_lsn = 3267131
+to_lsn = 3273698
+last_lsn = 3273707
+compact = 0
+recover_binlog_info = 0
+[root@mysql50 ~]# mysql -uroot -p123456
+给db5.a表中插入几条数据
+周二：将周一备份后新增的数据备份到/new2dir
+[root@mysql50 ~]# innobackupex --user root --password 123456 \
+ --incremental /new2dir --incremental-basedir=/new1dir --no-timestamp
+周三，周四以此类推................
+#################################################################
+增量恢复：
+[root@mysql50 ~]# cat /fullbak/xtrabackup_checkpoints 
+
+[root@mysql50 ~]# innobackupex --apply-log --redo-only /fullbak/
+[root@mysql50 ~]# innobackupex --apply-log --redo-only /fullbak --incremental-dir=/new1dir
+[root@mysql50 ~]# innobackupex --apply-log --redo-only /fullbak --incremental-dir=/new2dir
+[root@mysql50 ~]# cat /fullbak/xtrabackup_checkpoints 
+[root@mysql50 ~]# rm -rf /new1dir/
+[root@mysql50 ~]# rm -rf /new2dir/
+[root@mysql50 ~]# ls /var/lib/mysql
+[root@mysql50 ~]# rm -rf /var/lib/mysql/*
+将备份文件拷贝到数据库目录下
+[root@mysql50 ~]# innobackupex --copy-back /fullbak/
+[root@mysql50 ~]# ls /var/lib/mysql
+修改数据库目录的所有者和所属组为mysql用户
+[root@mysql50 ~]# chown -R mysql:mysql /var/lib/mysql
+[root@mysql50 ~]# systemctl restart mysqld
+[root@mysql50 ~]# mysql -uroot  -p123456
+mysql> show databases;
+##################################################
+######让51主机上数据库服务器和当前50上的主机数据一样
+50主机：
+[root@mysql50~]# scp /fullbak root@192.168.4.50:/ 
+51主机：
+[root@mysql51~]# systemctl stop mysqld
+[root@mysql51~]# rm -rf /var/lib/mysql/*
+[root@mysql51~]# ls /var/lib/mysql/*
+将备份文件拷贝到数据库目录下
+[root@mysql51~]# innobackupex --copy-back /fullbak/
+[root@mysql51~]# chown -R mysql:mysql /var/lib/mysql
+[root@mysql51~]# systemctl restart mysqld
+[root@mysql51~]# mysql -uroot -p123456
+mysql> show databases;
+###########################################################
+从完全备份的数据中恢复单张表数据
+完备：
+[root@mysql50 ~]# innobackupex --user root --password 123456 --databases="db5" /db5bak --no-timestamp
+190219 15:29:20 innobackupex: Starting the backup operation
+.............
+[root@mysql50 ~]# mysql -uroot -p123456
+mysql> use db5;
+mysql> show tables;
++---------------+
+| Tables_in_db5 |
++---------------+
+| a             |
+| b             |
++---------------+
+2 rows in set (0.00 sec)
+删除b 表
+mysql> drop table b;
+恢复b 表：
+创建被删除的表（表结构和原表一样）
+   mysql> create table db5.b(name char(10));
+   mysql> system ls /var/lib/mysql/db5/b.*;
+删除表空间
+   mysql> alter table db5.b discard tablespace;
+   mysql> system ls /var/lib/mysql/db5/b.*;
+在备份数据里导出表信息
+]# innobackupex --user root --password 123456
+     --apply-log --export /db5bak
+把导出的信息文件拷贝到数据库目录下
+]# cp /db5bak/db5/b.{exp,cfg,ibd} /var/lib/mysql/db5/
+修改所有者和所属组用户为mysql
+]# chown -R mysql:mysql /var/lib/mysql/db5/b.*
+导入表信息：
+mysql> alter table db5.b import tablespace;
+mysql> system rm -rf /var/lib/mysql/db5/b.exp;
+mysql> system rm -rf /var/lib/mysql/db5/b.cfg;
+查看数据：
+mysql> select * from db5.b;
+##########################################################
+
