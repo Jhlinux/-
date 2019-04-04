@@ -1,0 +1,43 @@
+虚拟机的组成：KVM/QEMU/LIBVIRT
+    KVM是Linux内核的模块，它需要CPU的支持，采用硬件辅助虚拟化技术Intel-VT,AMD-V
+    QEMU是一个虚拟化的仿真工具，通过ioctl与内核kvm交互完成对硬件的虚拟化支持
+    Libvirt:是一个对虚拟化管理的接口和工具，提供用户端程序，virsh  virt-install  virt-manager virt-view 与用户交互
+和虚拟机相关的两个文件：
+    /etc/libvirt/qemu/*.xml ---> 虚拟机配置声明文件
+    /var/lib/libvirt/images/*.qcow2---> 虚拟机的硬盘
+
+   虚拟化平台的安装
+yum -y install
+         qemu-kvm  ----> 为KVM提供底层仿真支持
+         libvirt-daemon --> libvirtd守护进程，管理虚拟机
+         libvirt-client --> 用户端软件，提供客户端管理命令
+         libvirt-daemon-driver-qemu ---> libvirtd连接qemu的驱动
+systemctl start libvirtd
+
+virsh命令工具：
+[root@room9pc01 ~]# virsh list --all 
+[root@room9pc01 ~]# virsh nodeinfo #查看KVM节点（服务器）信息
+[root@room9pc01 ~]# virsh dominfo redhat #查看指定虚拟机的信息
+[root@room9pc01 ~]# virsh start redhat 
+[root@room9pc01 ~]# virsh reboot redhat
+[root@room9pc01 ~]# virsh shutdown redhat
+[root@room9pc01 ~]# virsh destroy redhat  #强制关闭
+[root@room9pc01 ~]# virsh autostart redhat #开机自起动
+[root@room9pc01 ~]# virsh console redhat
+                  #连接到指定的虚拟机，退出：ctrl+}
+[root@room9pc01 ~]# virsh net-list --all 列出虚拟网络
+[root@room9pc01 ~]# virsh undefine 虚拟机名 #删除虚拟机
+分屏命令：screen
+远程连接别人主机：
+[root@room9pc01 ～]# virsh -c qemu+ssh://176.233.27.42/system
+定义虚拟交换机即虚拟网卡vbr
+[root@room9pc01 ~]# cp mydata/vbr.xml /etc/libvirt/qemu/networks/
+[root@room9pc01 ~]# cd /etc/libvirt/qemu/networks/
+[root@room9pc01 networks]# ls
+[root@room9pc01 networks]# virsh net-define /etc/libvirt/qemu/networks/vbr.xml 
+[root@room9pc01 networks]# virsh net-list --all
+[root@room9pc01 networks]# virsh net-start vbr
+[root@room9pc01 networks]# ifconfig 
+[root@node1 ~]# growpart /dev/vda 1 
+[root@node1 ~]# xfs_growfs /
+
