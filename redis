@@ -1,0 +1,427 @@
+redis简介：
+remote dictionary server远程字典服务器，是一款高性能的分布式内存数据库，支持数据持久化，可把内存的数据保存到硬盘里，也支持list,hash,set,zset数据类型，支持master_slave模型数据备份，中文网站www.redis.cn
+部署redis   port 6379
+安装依赖：
+[root@mysql50 ~]# yum -y install gcc 
+[root@mysql50 ~]# ls
+      redis-4.0.8.tar.gz
+[root@mysql50 ~]# tar -xvf redis-4.0.8.tar.gz 
+[root@mysql50 ~]# cd redis-4.0.8/
+[root@mysql50 redis-4.0.8]# ls
+00-RELEASENOTES  COPYING  Makefile   redis.conf       runtest-sentinel  tests
+BUGS             deps     MANIFESTO  runtest          sentinel.conf     utils
+CONTRIBUTING     INSTALL  README.md  runtest-cluster  src
+[root@mysql50 redis-4.0.8]# make && make install 
+初始化redis
+[root@mysql50 redis-4.0.8]# cd utils/
+[root@mysql50 utils]# bash install_server.sh
+
+[root@mysql50 utils]# ss -tunlp | grep redis
+tcp    LISTEN     0      128    127.0.0.1:6379                  *:*                   users:(("redis-server",pid=10761,fd=6))
+
+[root@mysql50 utils]# ps -C redis-server #查看进程
+  PID TTY          TIME CMD
+10761 ?        00:00:00 redis-server
+
+登陆redis
+[root@mysql50 ～]# redis-cli
+127.0.0.1:6379> set name hhh #存数据
+OK
+127.0.0.1:6379> get name #取数据
+"hhh"
+##############################################################
+redis 服务管理：
+    停止redis服务
+[root@mysql50 utils]# /etc/init.d/redis_6379 stop
+Stopping ...
+Redis stopped
+    启动redis服务
+[root@mysql50 utils]# /etc/init.d/redis_6379 start 
+Starting Redis server...
+[root@mysql50 utils]# ss -tunlp | grep redis
+tcp    LISTEN     0      128    127.0.0.1:6379                  *:*                   users:(("redis-server",pid=10886,fd=6))
+设置密码后 停止服务要输入密码
+[root@mysql50 ~]# /etc/init.d/redis_6379 stop
+[root@mysql50 ~]# vim /etc/redis/6379.conf
+501 requirepass 123456
+
+[root@mysql50 ~]# /etc/init.d/redis_6379 start
+Starting Redis server...
+连接后输入密码：
+[root@mysql50 ~]# redis-cli
+127.0.0.1:6379> auth 123456 #密码
+OK
+127.0.0.1:6379> set name ss 
+OK
+127.0.0.1:6379> get name
+"ss"
+连接之前输入密码：
+[root@mysql50 ~]# redis-cli -a  123456
+127.0.0.1:6379> set name ssss
+OK
+127.0.0.1:6379> get name
+"ssss"
+用命令停止redis服务
+[root@mysql50 ~]# redis-cli -a 123456 shutdown
+[root@mysql50 ~]# ss -tunlp |grep redis
+[root@mysql50 ~]# 
+改脚本停止redis服务
+[root@mysql50 ~]# vim /etc/init.d/redis_6379 
+43 $CLIEXEC -p $REDISPORT -a 123456 shutdown
+[root@mysql50 ~]# ss -tunlp |grep redis
+tcp    LISTEN     0      128    127.0.0.1:6379                  *:*                   users:(("redis-server",pid=11289,fd=6))
+[root@mysql50 ~]# /etc/init.d/redis_6379 stop 
+Stopping ...
+Redis stopped
+[root@mysql50 ~]# ss -tunlp |grep redis
+[root@mysql50 ~]# /etc/init.d/redis_6379 start
+Starting Redis server...
+[root@mysql50 ~]# ss -tunlp |grep redis
+tcp    LISTEN     0      128    127.0.0.1:6379                  *:*                   users:(("redis-server",pid=11302,fd=6))
+###################################################################################################################
+redis数据管理常用的命令：
+[root@mysql50 ~]# redis-cli -a 123456
+127.0.0.1:6379> set name jhh #存数据
+OK
+127.0.0.1:6379> get name #取数据
+"jhh"
+127.0.0.1:6379> select 1 #切换库 
+   #redis默认有16个库，编号0--15
+OK
+127.0.0.1:6379[1]> 
+127.0.0.1:6379[1]> keys * #打印所有变量
+127.0.0.1:6379[1]> keys a? #打印指定变量
+127.0.0.1:6379[1]> exists name
+(integer) 1
+127.0.0.1:6379[1]> ttl name #查看存储时间
+(integer) -1 #永久存储
+127.0.0.1:6379[1]> type name #查看变量类型
+string #字符类型
+127.0.0.1:6379[1]> move name 2 #将库1的name变量移动到库2
+(integer) 1
+127.0.0.1:6379[1]> expire name 10 #设置有效时间
+(integer) 0
+127.0.0.1:6379[1]> del name #删除变量
+(integer) 0
+127.0.0.1:6379[1]> get name
+(nil)
+127.0.0.1:6379[1]> flushall #删除所有变量
+127.0.0.1:6379[1]> save #保存所有变量
+127.0.0.1:6379[1]> shutdown #关闭redis服务
+not connected> 
+################################################
+redis配置文件：
+改端口 改密码  改连接ip
+[root@mysql51 ~]# /etc/init.d/redis_6379 stop
+[root@mysql51 ~]# vim /etc/redis/6379.conf
+ 70 bind 192.168.4.51
+ 93 port 6351
+ 264 dir /var/lib/redis/6379 #指定数据存放目录
+ 501 requirepass 123456 #指定密码
+[root@mysql51 ~]# /etc/init.d/redis_6379 start
+[root@mysql51 ~]# ss -tunlp | grep redis
+tcp    LISTEN     0      128    192.168.4.51:6351                  *:*                   users:(("redis-server",pid=18711,fd=6))
+停止服务：
+[root@mysql51 ~]# redis-cli -h 192.168.4.51 -p 6351 -a 123456 shutdown
+   
+##############################################################3
+部署lnmp+redis  
+搭建网站服务器----> 192.168.4.50
+centos下：yum -y install nginx
+源码编译安装nginx
+[root@mysql50 nginx-1.12.2]# ./configure --user=nginx --group=nginx --with-http_ssl_module 
+[root@mysql50 nginx-1.12.2]# make && make install
+[root@mysql50 ~]# useradd nginx
+[root@mysql50 ~]# /usr/local/nginx/sbin/nginx #启动nginx服务
+[root@mysql50 ~]# ss -tunlp | grep :80
+tcp    LISTEN     0      128       *:80                    *:*                   users:(("nginx",pid=23445,fd=6),("nginx",pid=23444,fd=6))
+安装php-fpm
+[root@mysql50 ~]# ls
+   php-fpm-5.4.16-42.el7.x86_64.rpm
+   php-devel-5.4.16-42.el7.x86_64.rpm
+[root@mysql50 ~]# yum -y install php-fpm-5.4.16-42.el7.x86_64.rpm
+[root@mysql50 ~]# systemctl restart php-fpm
+[root@mysql50 ~]# systemctl enable php-fpm
+[root@mysql50 ~]# ss -tunlp |grep php-fpm
+tcp    LISTEN     0      128    127.0.0.1:9000  
+修改nginx配置文件：
+    server {
+ 36         listen       80;
+ 42         server_name   localhost;
+ 43         location / {
+ 44             root   html;
+ 45             index  index.php index.html index.htm;
+ 46         }
+ 65         location ~ \.php$ {
+ 66             root           html;
+ 67             fastcgi_pass   127.0.0.1:9000;
+ 68             fastcgi_index  index.php;
+ 69         #    fastcgi_param  SCRIPT_FILENAME  /scripts$fastcgi_script_name;
+ 70             include        fastcgi.conf;
+ 71         }
+     }
+[root@mysql50 ~]# /usr/local/nginx/sbin/nginx -s reload
+部署php测试页面：
+[root@mysql50 ~]# vim /usr/local/nginx/html/index.php
+<?php
+$i="This is a test Page";
+echo $i;
+?>
+客户端访问测试：
+     http://192.168.4.50
+搭建redis数据库服务器：192.168.4.51
+   装包    初始化配置    修改配置指定端口 服务ip  连接密码
+配置php支持redis --->192.168.4.50
+安装提供redis模块的软件包：
+[root@mysql50 ~]# yum -y install php-devel-5.4.16-42.el7.x86_64.rpm 
+[root@mysql50 ~]# tar -xvf php-redis-2.2.4.tar.gz
+[root@mysql50 ~]# cd phpredis-2.2.4/
+[root@mysql50 phpredis-2.2.4]# phpize
+[root@mysql50 phpredis-2.2.4]# ./configure --with-php-config=/usr/bin/php-config
+[root@mysql50 phpredis-2.2.4]# make && make install
+[root@mysql50 phpredis-2.2.4]# ls /usr/lib64/php/modules/
+curl.so      mbstring.so  pdo_mysql.so   phar.so     zip.so
+fileinfo.so  mysqli.so    pdo.so         redis.so
+json.so      mysql.so     pdo_sqlite.so  sqlite3.so
+配置php程序运行时 加载redis模块
+[root@mysql50 ~]# vim /etc/php.ini 
+728  extension_dir = "/usr/lib64/php/modules/"
+ 729 ; On windows:
+ 730 extension  = "redis.so"
+[root@mysql50 ~]# systemctl restart  php-fpm
+查看php是否支持redis
+[root@mysql50 ~]# php -m | grep -i redis
+redis
+编写连接redis的脚本 存储数据 查看数据----> 50上
+[root@mysql50 ~]# vim /usr/local/nginx/html/test.php
+<?php
+$redis = new redis();
+$redis->connect('192.168.4.51',6351);
+$redis->auth("123456");
+$redis->set("hehe","xixi");
+echo $redis->get("hehe");
+?>
+客户端测试：http://192.168.4.50/test.php
+然后去redis服务器上看是否有数据
+##################################################
+创建redis集群
+51--56启用集群配置：
+以53为例：
+[root@mysql53 utils]# /etc/init.d/redis_6353 stop
+[root@mysql53 utils]# ls /var/lib/redis/6353/
+dump.rdb
+[root@mysql53 utils]# rm -rf /var/lib/redis/6353/*
+[root@mysql53 utils]# vim /etc/redis/6353.conf
+93 port 6353
+70 bind 192.168.4.53
+815 cluster-enabled yes
+823 cluster-config-file nodes-6353.conf
+829 cluster-node-timeout 5000
+[root@mysql53 utils]# /etc/init.d/redis_6353 start
+此时要停止服务：
+[root@mysql53 utils]# redis-cli -h 192.168.4.53 -p 6353 shutdown
+起服务：
+[root@mysql53 utils]# /etc/init.d/redis_6353 start
+################################################
+创建集群：
+部署管理主机51
+安装依赖：
+[root@mysql51 ~]# yum -y install ruby rubygems
+[root@mysql51 ~]# yum -y install ruby-devel-2.0.0.648-30.el7.x86_64.rpm  #yum源里没有
+[root@mysql51 ~]# gem install redis-3.2.1.gem 
+创建管理集群的命令：
+[root@mysql51 ~]# cd ./redis-4.0.8/src/
+[root@mysql51 src]# ls *.rb
+redis-trib.rb
+[root@mysql51 src]# cp redis-trib.rb /root/bin/
+[root@mysql51 src]# chmod +x /root/bin/redis-trib.rb
+创建集群：
+[root@mysql51 ~]# redis-trib.rb create --replicas 1 \
+> 192.168.4.51:6351 \
+> 192.168.4.52:6352 \
+> 192.168.4.53:6353 \
+> 192.168.4.54:6354 \
+> 192.168.4.55:6355 \
+> 192.168.4.56:6356
+查看集群信息：在任意一台服务器都可以查看
+[root@mysql51 ~]# redis-cli -h 192.168.4.51 -p 6351 
+192.168.4.51:6351> cluster info
+cluster_state:ok
+cluster_slots_assigned:16384
+cluster_slots_ok:16384
+cluster_slots_pfail:0
+cluster_slots_fail:0
+cluster_known_nodes:6
+cluster_size:3
+..............
+192.168.4.51:6351> cluster nodes #查看节点信息
+在管理主机上查看集群信息和检测集群
+[root@mysql51 ~]# redis-trib.rb  info  192.168.4.51:6351
+192.168.4.51:6351 (1c228b18...) -> 0 keys | 5461 slots | 1 slaves.
+192.168.4.53:6353 (4da54a3e...) -> 0 keys | 5461 slots | 1 slaves.
+192.168.4.52:6352 (e9929fec...) -> 0 keys | 5462 slots | 1 slaves.
+[OK] 0 keys in 3 masters.
+0.00 keys per slot on average.
+集群测试：在客户端50上连接任意一台集群中的主机都可以存取数据 从库会自动同步主库的数据到本机
+[root@mysql50 ~]# redis-cli -c -h 192.168.4.51 -p 6351
+192.168.4.51:6351> set name eee
+-> Redirected to slot [5798] located at 192.168.4.52:6352
+OK
+192.168.4.52:6352> get name
+"eee"
+
+当主库宕机后对应的从库会自动升级为主库 
+##################################################################
+管理redis集群：
+向集群里添加master 角色redis服务器
+[root@mysql51 ~]# redis-trib.rb add-node 192.168.4.58:6358 192.168.4.51:6351
+分配hash slot给58主机
+[root@mysql51 ~]# redis-trib.rb reshard 192.168.4.51:6351
+查看集群信息：
+[root@mysql51 ~]# redis-trib.rb  check 192.168.4.51:6351
+用50连接58测试
+[root@mysql50 ~]# redis-cli -c -h 192.168.4.58 -p 6358
+192.168.4.58:6358> set nn eee
+-> Redirected to slot [9549] located at 192.168.4.52:6352
+OK
+192.168.4.52:6352> get nn
+"eee"
+
+向集群里添加slave 角色redis服务器
+[root@mysql51 ~]# redis-trib.rb add-node --slave 192.168.4.57:6357 192.168.4.51:6351
+[root@mysql51 ~]# redis-trib.rb   info  192.168.4.51:6351
+[root@mysql51 ~]# redis-trib.rb   check  192.168.4.51:6351
+用50连接57测试：
+[root@mysql50 redis]# redis-cli  -c  -h 192.168.4.57 -p 6357
+#########################################################
+从集群里移除master slave服务器
+移除57---slave
+[root@mysql51 ~]# redis-trib.rb check 192.168.4.51:6351
+S: e9f47e8cde2dc5ee0f29e4911f445a6f4a48a5e7 192.168.4.57:6357
+   slots: (0 slots) slave
+   replicates 0dfbc47c7471c315be92ce070a17616e15299666
+[root@mysql51 ~]# redis-trib.rb del-node 192.168.4.51:6351 e9f47e8cde2dc5ee0f29e4911f445a6f4a48a5e7 
+[root@mysql51 ~]# redis-trib.rb info 192.168.4.51:6351
+[root@mysql51 ~]# redis-trib.rb check 192.168.4.51:6351
+从集群里移除master角色的服务器 ----> 58
+先要释放主库占用的hash slot槽
+[root@mysql51 ~]# redis-trib.rb  reshard  192.168.4.51:6351
+         指定移除的hash槽个数
+         指定接收hash槽主机ID
+         指定移除hash槽主机ID
+移除主库
+[root@mysql51 ~]# redis-trib.rb  del-node 192.168.4.51:6351 008840071433723a9621a28f2ca5552dd73cfc17（58 ID）
+查看信息
+[root@mysql51 ~]# redis-trib.rb  info  192.168.4.51:6351 
+[root@mysql51 ~]# redis-trib.rb  check  192.168.4.51:6351 
+
+平均分配hash slot
+[root@mysql51 ~]# redis-trib.rb rebalance  192.168.4.51:6351
+查看信息
+[root@mysql51 ~]# redis-trib.rb  info  192.168.4.51:6351 
+192.168.4.51:6351 (1c228b18...) -> 2 keys | 5461 slots | 1 slaves.
+192.168.4.53:6353 (4da54a3e...) -> 4 keys | 5462 slots | 1 slaves.
+192.168.4.56:6356 (3ecd861b...) -> 3 keys | 5461 slots | 1 slaves.
+[OK] 9 keys in 3 masters.
+0.00 keys per slot on average.
+把移除的redis服务器再添加到集群里
+在数据库服务器本机清除集群信息
+]# /etc/init.d/redis_6379 start
+]# redis-cli -h ip地址  -p 端口
+ > cluster reset
+ > exit
+在管理主机上执行添加主机命令
+[root@mysql51 ~]# redis-trib.rb  add-node ip地址:端口 192.168.4.51:6351
+[root@mysql51 ~]# redis-trib.rb check 192.168.4.51:6351
+
+################################################################
+部署redis 主从复制：
+对应的命令：
+     info replication  #查看复制信息
+     slaveof ip地址 端口 #指定主库
+     slaveof no one  #恢复为主库
+任意一台主机的redis服务运行后 默认都是主库
+一主多从：
+51主库  52 53 54 55 56都做从库
+51主库的配置（带密码）
+[root@mysql51 ~]# ss -tunlp | grep redis
+tcp    LISTEN     0      128    192.168.4.51:6351                  *:*   users:(("redis-server",pid=5163,fd=6))
+从库的配置：以52为例
+[root@mysql52 ~]# vim /etc/redis/6352.conf 
+282 slaveof 192.168.4.51 6351 #指定主库    
+289 masterauth "123456" #指定主库密码
+
+[root@mysql52 ~]# /etc/init.d/redis_6352 start
+Starting Redis server...
+[root@mysql52 ~]# ss -tunlp | grep redis
+tcp    LISTEN     0      128    192.168.4.52:6352                  *:*                   users:(("redis-server",pid=27448,fd=6))
+测试：客户端50连接主库 可写 可查
+      客户端50连接从库可查看到
+
+###############################################################
+主主从
+        51主库
+          | 
+          |
+        52从库(54的主库)
+          |
+          |
+        54从库
+##############################################################
+哨兵模式：哨兵服务 监视主库 当主库宕机后 从对应的从库中选新的主库 
+在192.168.4.55上配置哨兵服务监视主库51
+安装redis软件包
+[root@mysql55 ~]# ls
+ redis-4.0.8
+ redis-4.0.8.tar.gz
+[root@mysql55 ~]# ls ./redis-4.0.8
+    sentinel.conf
+创建服务主配置文件
+[root@mysql55 ~]# vim /etc/sentinel.conf
+bing 0.0.0.0
+sentinel monitor db1 192.168.4.51 6351 1 
+sentinel auth-pass db1 123456
+启动服务
+[root@mysql55 ~]# ping -c 3 192.168.4.51 
+[root@mysql55 ~]# redis-sentinel /etc/sentinel.conf #启动服务
+测试：
+停止主库51的redis服务
+[root@mysql51 ~]# redis-cli -h 192.168.4.51 -p 6351 -a 123456 shutdown
+查看55的服务监控信息
+[root@mysql55 ~]# cat /etc/sentinel.conf 
+bind 0.0.0.0
+sentinel myid 2cc4b0f1a35c4209bca3568c097f96ac303e6951
+sentinel monitor db1 192.168.4.52 6352 1
+在从库上查看主从复制信息：51宕机后 52成为主库
+[root@mysql52 ~]# redis-cli -h 192.168.4.52 -p 6352 -a 123456 
+192.168.4.52:6352> info replication #查看主从复制信息
+# Replication
+role:master
+connected_slaves:1
+slave0:ip=192.168.4.54,port=6354,state=online,offset=82754,lag=0
+################################################################
+redis数据持久化：服务在运行过程中 自动把内存里的数据定期保存到硬盘里
+redis数据持久化的方式：rdb 和 aof
+使用RDB文件恢复数据：让新部署的服务器56和当前主库数据一致
+[root@mysql52 ~]# redis-cli -h 192.168.4.52 -p 6352 -a 123456 
+192.168.4.52:6352> keys *
+1) "name"
+192.168.4.52:6352> save
+OK
+192.168.4.52:6352> exit
+[root@mysql52 ~]# cp /var/lib/redis/6352/dump.rdb /root/
+[root@mysql52 ~]# scp /root/dump.rdb root@192.168.4.56:/root/
+[root@mysql56 ~]# redis-cli -h 192.168.4.56 -p 6356 -a 123456 shutdown
+[root@mysql56 ~]# rm -rf /var/lib/redis/6356/dump.rdb 
+[root@mysql56 ~]# cp /root/dump.rdb /var/lib/redis/6356/
+[root@mysql56 ~]# /etc/init.d/redis_6356 start
+Starting Redis server...
+[root@mysql56 ~]# redis-cli -h 192.168.4.56 -p 6356 -a 123456192.168.4.56:6356> keys * 
+1) "name"
+与RDB文件相关的配置：
+]# vim  /etc/redis/6379.conf
+        dbfilename dump.rdb
+	save 900 1
+ 	save 300 10 #设置存盘间隔为300妙 10个key改变存盘
+ 	save 60 10000
+

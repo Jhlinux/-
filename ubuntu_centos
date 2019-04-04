@@ -16,6 +16,7 @@ yum源位置：/etc/yum.repos.d/centos.repo
 装包：yum -y install 
 安装一组程序包：yum -y groupinstall + 程序组名
 更新源：yum update
+生成yum缓存：yum makecache
 更新指定组：yum -y groupupdate
 
 卸包：yum remove
